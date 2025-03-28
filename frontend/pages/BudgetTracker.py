@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import datetime
 from dateutil import parser as date_parser
+from matplotlib.patches import Patch
 
 st.set_page_config(page_title="Budget Tracker", layout="centered")
 st.title("📊 Budget Tracker - Monthly Overspending")
@@ -68,33 +69,60 @@ else:
             new_notes = generate_notifications(overspending, selected_month)
             st.session_state['notifications'].extend(new_notes)
 
-        # Prepare chart data
-        categories = [item['category'] for item in summary]
-        spent = [item['spent'] for item in summary]
-        limits = [item['limit'] for item in summary]
+        # Filter valid data (exclude empty rows)
+        plot_data = [
+            (item['category'], item['spent'], item['limit'])
+            for item in summary
+            if item['spent'] > 0 or item['limit'] > 0
+        ]
+
+        categories = [cat for cat, _, _ in plot_data]
+        spent = [s for _, s, _ in plot_data]
+        limits = [l for _, _, l in plot_data]
+
         x = np.arange(len(categories))
         width = 0.35
 
         fig, ax = plt.subplots(figsize=(12, 6))
 
-        bar_colors = ['crimson' if spent[i] > limits[i] else 'royalblue' for i in range(len(categories))]
+        # Determine color for each spent bar
+        bar_colors = ['crimson' if spent[i] > limits[i] else 'royalblue' for i in range(len(spent))]
 
+        # Plot bars
         bars_spent = ax.bar(x - width/2, spent, width, label='Spent', color=bar_colors)
-        bars_limit = ax.bar(x + width/2, limits, width, label='Limit', color='lightgray')
+        bars_limit = ax.bar(x + width/2, limits, width, label='Limit', color='lightgray', edgecolor='black')
 
+        # Annotate overspending
         for i in range(len(categories)):
             if spent[i] > limits[i]:
                 ax.text(
-                    x[i], spent[i] + max(spent) * 0.02,
+                    x[i], spent[i] + max(spent) * 0.01,
                     f"Over by ${spent[i] - limits[i]:.2f}",
                     ha='center', color='red', fontsize=10, fontweight='bold'
                 )
 
+        # Annotate limits (above limit bar)
+        for i in range(len(categories)):
+            ax.text(
+                x[i] + width/2, limits[i] + max(spent) * 0.01,
+                f"${limits[i]:.0f}",
+                ha='center', color='gray', fontsize=8
+            )
+
+        # Chart styling
         ax.set_xlabel("Category", fontsize=12)
         ax.set_ylabel("Amount ($)", fontsize=12)
         ax.set_title(f"📊 Budget vs Spending — {selected_month}", fontsize=14)
         ax.set_xticks(x)
         ax.set_xticklabels(categories, rotation=15)
-        ax.legend(title="Legend", loc="upper right", frameon=True)
 
+        # Custom legend with colors that match actual bars
+        legend_elements = [
+            Patch(facecolor='royalblue', label='Spent (Within Limit)'),
+            Patch(facecolor='crimson', label='Overspent'),
+            Patch(facecolor='lightgray', edgecolor='black', label='Limit')
+        ]
+        ax.legend(handles=legend_elements, title="Legend", loc="upper right", frameon=True)
+
+        # Display in Streamlit
         st.pyplot(fig)
