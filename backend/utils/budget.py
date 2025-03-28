@@ -9,6 +9,9 @@ class BudgetTracker:
 
     def set_monthly_limit(self, year_month, category, limit):
         self.monthly_limits[year_month][category] = limit
+        
+    def reset_month(self, year_month):
+        self.monthly_expenses[year_month] = defaultdict(float)
 
     def track_monthly_expenses(self, transactions):
         for tx in transactions:
@@ -20,9 +23,23 @@ class BudgetTracker:
                 raise ValueError(f"❌ Failed to parse date '{tx['date']}' - expected format '%a, %d %b %Y %H:%M:%S', after cleaning got: '{cleaned_date}'") from e
 
             year_month = date.strftime("%Y-%m")
-            category = tx.get('category', ['Uncategorized'])[0]
+
+            # ✅ Robust category extraction
+            raw_category = tx.get('category', ['Uncategorized'])
+
+            if isinstance(raw_category, list) and raw_category:
+                category = raw_category[0]
+            elif isinstance(raw_category, str):
+                category = raw_category
+            else:
+                category = "Uncategorized"
+
+            # ✅ Ensure outer and inner dicts exist (full safety)
+            if year_month not in self.monthly_expenses:
+                self.monthly_expenses[year_month] = defaultdict(float)
+
             self.monthly_expenses[year_month][category] += abs(float(tx['amount']))
-  
+
     def get_overspending_summary(self, year_month):
         overspending = {}
         for category, spent in self.monthly_expenses[year_month].items():
