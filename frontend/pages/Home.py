@@ -107,6 +107,7 @@ if st.button("Get Transactions"):
                 for tx in transactions
             ]
             st.dataframe(table, use_container_width=True)
+            st.session_state["transactions"] = transactions
     else:
         st.error("❌ Failed to fetch transactions.")
         try:
