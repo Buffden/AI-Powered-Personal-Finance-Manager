@@ -91,7 +91,7 @@ if st.button("Get Transactions"):
     if tx_response.status_code == 200:
         data = tx_response.json()
         transactions = data.get("transactions", [])
-
+        st.session_state['transactions'] = transactions
         if not transactions:
             st.warning("No transactions found.")
         else:
