@@ -1,4 +1,4 @@
-# Starter code for frontend/app.py
+# frontend/app.py
 import streamlit as st
 import sys
 from pathlib import Path
@@ -9,112 +9,85 @@ project_root = frontend_path.parent
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
-# Initialize session state for current page
-if 'current_page' not in st.session_state:
-    st.session_state.current_page = 'home'
-
+# Set page config
 st.set_page_config(
     page_title="AI Finance Manager",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for styling
+# Initialize session state
+if "current_page" not in st.session_state:
+    st.session_state["current_page"] = "home"
+
+# Custom CSS
 st.markdown("""
     <style>
-        /* Sidebar container styling */
         section[data-testid="stSidebar"] > div {
-            background-color: rgb(17, 24, 39);
-            padding: 1rem;
+            background-color: #111827;
+            padding: 2rem 1rem;
         }
-        
-        /* Logo and company name container */
         .sidebar-logo {
-            margin: 25px 0 45px 0;
             display: flex;
             align-items: center;
-            gap: 15px;
-            padding: 10px;
+            gap: 1rem;
+            margin-bottom: 3rem;
+            padding: 0 0.5rem;
         }
-        
         .logo-icon {
-            width: 45px;
-            height: 45px;
-            background-color: rgb(30, 41, 59);
-            padding: 10px;
-            border-radius: 12px;
+            width: 3rem;
+            height: 3rem;
+            background-color: #1e293b;
+            border-radius: 0.75rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 1.5rem;
         }
-        
         .company-name {
-            color: rgb(250, 250, 250);
-            font-size: 20px;
+            color: #ffffff;
+            font-size: 1.5rem;
             font-weight: 500;
         }
-        
-        /* Navigation button styling */
-        .stButton > button {
+        .nav-button {
             width: 100%;
-            background-color: rgb(30, 41, 59);
-            color: rgb(250, 250, 250);
+            color: #e5e7eb;
             border: none;
-            text-align: left !important;
-            padding: 12px 16px;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            margin: 0.25rem 0;
+            border-radius: 0.5rem;
             cursor: pointer;
-            border-radius: 8px;
-            margin: 4px 0;
+            font-size: 1rem;
             transition: all 0.2s ease;
-            font-size: 16px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            min-height: 48px;
+            gap: 0.75rem;
+            background-color: transparent;
         }
-        
-        /* Button states */
-        .stButton > button:hover {
-            background-color: rgb(41, 55, 80);
+        .nav-button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
         }
-        
-        .stButton > button:active {
-            background-color: rgb(51, 65, 90);
+        .nav-selected {
+            background-color: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(6px);
         }
-        
-        /* Selected button state */
-        .selected-nav {
-            background-color: rgb(51, 65, 90) !important;
+        .nav-wrapper {
+            display: flex;
+            flex-direction: column;
         }
-        
-        /* Hide default Streamlit branding */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        
-        /* Adjust button icon and text alignment */
-        .stButton > button > div {
-            display: flex !important;
-            align-items: center !important;
-            gap: 12px !important;
+        .nav-button:focus {
+            outline: none;
+            box-shadow: none;
         }
-        
-        /* Remove default button styles */
-        .stButton > button:focus {
-            box-shadow: none !important;
-        }
-        
-        /* Adjust sidebar padding */
+        #MainMenu, footer, header {visibility: hidden;}
         section[data-testid="stSidebar"] .block-container {
-            padding-top: 0;
-            padding-left: 0;
-            padding-right: 0;
+            padding: 0;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# Add logo and company name to sidebar
+# Logo and App Title
 st.sidebar.markdown("""
     <div class="sidebar-logo">
         <div class="logo-icon">💰</div>
@@ -122,21 +95,30 @@ st.sidebar.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Navigation buttons with session state management
-active_page = st.session_state.current_page
-for btn_data in [
-    ("🏦", "Connect Bank", 'home'),
-    ("📊", "Budget Tracking", 'budget'),
-    ("📈", "Spending Insights", 'insights'),
-    ("🔔", "Bill Reminders", 'bills'),
-    ("💬", "AI Financial Advisor", 'chatbot')
-]:
-    icon, label, page = btn_data
-    button_class = "selected-nav" if page == active_page else ""
-    if st.sidebar.button(f"{icon} {label}", key=f"nav_{page}", 
-                        use_container_width=True,
-                        help=f"Navigate to {label}"):
-        st.session_state.current_page = page
+# Navigation
+pages = [
+    ("🏠", "Home", "home"),
+    ("📊", "Budget Tracking", "budget"),
+    ("📈", "Spending Insights", "insights"),
+    ("🔔", "Bill Reminders", "bills"),
+    ("💬", "AI Financial Advisor", "chatbot")
+]
+
+st.sidebar.markdown('<div class="nav-wrapper">', unsafe_allow_html=True)
+for icon, label, page in pages:
+    selected = "nav-button nav-selected" if st.session_state["current_page"] == page else "nav-button"
+    if st.sidebar.button(f"{icon} {label}", key=page):
+        st.session_state["current_page"] = page
+        st.rerun()
+    st.sidebar.markdown(f"""
+        <script>
+        var btn = window.parent.document.querySelector('button[key="nav_{page}"]');
+        if (btn) {{
+            btn.className = '{selected}';
+        }}
+        </script>
+    """, unsafe_allow_html=True)
+st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
 # Import views
 from views.Home import show_home
@@ -145,14 +127,14 @@ from views.Insights import show_insights
 from views.BillReminders import show_bill_reminders
 from views.Chatbot import show_chatbot
 
-# Main content area
-if st.session_state.current_page == 'home':
+# Page rendering
+if st.session_state["current_page"] == "home":
     show_home()
-elif st.session_state.current_page == 'budget':
+elif st.session_state["current_page"] == "budget":
     show_budget_tracker()
-elif st.session_state.current_page == 'insights':
+elif st.session_state["current_page"] == "insights":
     show_insights()
-elif st.session_state.current_page == 'bills':
+elif st.session_state["current_page"] == "bills":
     show_bill_reminders()
-elif st.session_state.current_page == 'chatbot':
+elif st.session_state["current_page"] == "chatbot":
     show_chatbot()
