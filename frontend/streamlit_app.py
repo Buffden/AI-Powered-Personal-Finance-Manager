@@ -98,7 +98,33 @@ st.markdown("""
             min-width: 1.5rem;
             text-align: center;
         }
+        /* Auto-scroll behavior */
+        div.element-container:first-of-type {
+            scroll-margin-top: 0;
+        }
+        
+        /* Smooth scrolling */
+        .main {
+            scroll-behavior: smooth;
+        }
     </style>
+    <script>
+        // More robust scroll to top function
+        function scrollToTop() {
+            setTimeout(function() {
+                window.parent.document.querySelector('section.main').scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }, 100);
+        }
+        
+        // Call on page load
+        window.addEventListener('load', scrollToTop);
+        
+        // Also call when Streamlit has finished re-running
+        window.addEventListener('streamlit:render', scrollToTop);
+    </script>
 """, unsafe_allow_html=True)
 
 # Logo and App Title
@@ -112,6 +138,7 @@ st.sidebar.markdown("""
 # Navigation
 pages = [
     ("🏠", "Home", "home"),
+    ("🏦", "Add Bank Account", "add_bank"),
     ("📊", "Budget Tracking", "budget"),
     ("📈", "Spending Insights", "insights"),
     ("🔔", "Bill Reminders", "bills"),
@@ -136,6 +163,7 @@ st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
 # Import views
 from views.Home import show_home
+from views.AddBankAccount import show_add_bank_account
 from views.BudgetTracker import show_budget_tracker
 from views.Insights import show_insights
 from views.BillReminders import show_bill_reminders
@@ -144,6 +172,8 @@ from views.Chatbot import show_chatbot
 # Page rendering
 if st.session_state["current_page"] == "home":
     show_home()
+elif st.session_state["current_page"] == "add_bank":
+    show_add_bank_account()
 elif st.session_state["current_page"] == "budget":
     show_budget_tracker()
 elif st.session_state["current_page"] == "insights":
