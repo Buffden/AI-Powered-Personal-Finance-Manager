@@ -24,57 +24,61 @@ if "current_page" not in st.session_state:
 st.markdown("""
     <style>
         section[data-testid="stSidebar"] > div {
-            background-color: #111827;
-            padding: 2rem 1rem;
+            background-color: #0f172a;
+            padding: 1.5rem 1rem;
         }
         .sidebar-logo {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 3rem;
+            gap: 0.875rem;
+            margin-bottom: 2.5rem;
             padding: 0 0.5rem;
         }
         .logo-icon {
-            width: 3rem;
-            height: 3rem;
+            width: 2.25rem;
+            height: 2.25rem;
             background-color: #1e293b;
-            border-radius: 0.75rem;
+            border-radius: 0.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.25rem;
         }
         .company-name {
-            color: #ffffff;
-            font-size: 1.5rem;
+            color: #f8fafc;
+            font-size: 1.125rem;
             font-weight: 500;
         }
         .nav-button {
             width: 100%;
-            color: #e5e7eb;
+            color: #e2e8f0;
             border: none;
             text-align: left;
-            padding: 0.75rem 1rem;
-            margin: 0.25rem 0;
-            border-radius: 0.5rem;
+            padding: 0.625rem 0.875rem;
+            margin: 0.125rem 0;
+            border-radius: 0.375rem;
             cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s ease;
+            font-size: 0.9375rem;
+            transition: background-color 0.15s ease;
             display: flex;
             align-items: center;
             gap: 0.75rem;
             background-color: transparent;
+            font-weight: 400;
+            line-height: 1.5;
         }
         .nav-button:hover {
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: rgba(148, 163, 184, 0.1);
         }
         .nav-selected {
-            background-color: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(6px);
+            background-color: #334155 !important;
+            color: #ffffff;
         }
         .nav-wrapper {
             display: flex;
             flex-direction: column;
+            gap: 0.25rem;
+            padding: 0 0.25rem;
         }
         .nav-button:focus {
             outline: none;
@@ -83,6 +87,16 @@ st.markdown("""
         #MainMenu, footer, header {visibility: hidden;}
         section[data-testid="stSidebar"] .block-container {
             padding: 0;
+        }
+        /* Fix button width consistency */
+        .stButton > button {
+            width: 100% !important;
+        }
+        /* Ensure icons are consistently sized */
+        .nav-button span {
+            font-size: 1.125rem;
+            min-width: 1.5rem;
+            text-align: center;
         }
     </style>
 """, unsafe_allow_html=True)
