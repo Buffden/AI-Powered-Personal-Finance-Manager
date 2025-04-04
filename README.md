@@ -11,12 +11,15 @@ An intelligent finance web application that allows users to securely connect ban
 - Fetch transaction history in real-time
 
 ### 🧠 AI-Powered Financial Analysis
-- Auto-categorize transactions (e.g., Food, Travel)
+- Auto-categorize transactions with smart category detection
+- AI-powered budget suggestions based on spending patterns
 - AI chatbot for financial insights and budgeting tips
 - Receipt scanning & extraction using **ChatGPT Vision** (optional upgrade)
 
 ### 📊 Budget Tracking & Insights
 - Set monthly spending limits per category
+- Smart budget suggestions based on historical spending
+- Interactive visualizations comparing budget vs. actual spending
 - Get alerts when nearing/exceeding limits
 - Visualize expenses by category & time
 
@@ -35,7 +38,7 @@ An intelligent finance web application that allows users to securely connect ban
 
 | Layer        | Technology                      |
 |--------------|----------------------------------|
-| **Frontend** | Streamlit (Python),              |
+| **Frontend** | Streamlit (Python), Altair (Visualizations) |
 | **Backend**  | Flask REST API                   |
 | **AI Layer** | OpenAI GPT (ChatGPT & Vision)    |
 | **Banking**  | Plaid  API                       |
@@ -50,15 +53,23 @@ An intelligent finance web application that allows users to securely connect ban
 AI-Powered-Personal-Finance-Manager/
 ├── backend/
 │   ├── flask_app.py
-│   └── routes/
-│       └── plaid_routes.py
+│   ├── routes/
+│   │   └── plaid_routes.py
+│   └── utils/
+│       ├── budget.py
+│       ├── config.py
+│       └── notifications.py
 ├── frontend/
 │   ├── streamlit_app.py
-│   └── pages/
+│   ├── components/
+│   │   └── charts.py
+│   └── views/
 │       ├── Home.py
 │       ├── BudgetTracker.py
 │       ├── BillReminders.py
-│       └── Insights.py
+│       ├── Insights.py
+│       ├── AddBankAccount.py
+│       └── Chatbot.py
 ├── .env
 └── requirements.txt
 ```
