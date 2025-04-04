@@ -8,6 +8,7 @@ import datetime
 import openai
 from backend.utils.config import Config
 import json
+from components.AccountSelector import show_account_selector
 
 def categorize_transactions(transactions):
     """Use OpenAI to categorize transactions and suggest budgets."""
@@ -186,12 +187,27 @@ def analyze_transactions_for_budgets(categorized_transactions):
 def show_budget_tracker():
     st.title("📊 Budget Tracker - Monthly Overspending")
 
+    # Add Account Selector at the top
+    selected_accounts = show_account_selector()
+
+    if not selected_accounts:
+        st.warning("⚠️ Please select at least one account to view budget tracking.")
+        st.stop()
+
     # Ensure transactions exist
     if 'transactions' not in st.session_state:
         st.warning("⚠️ Please fetch transactions from the Home page first.")
         st.stop()
 
-    transactions = st.session_state['transactions']
+    # Filter transactions for selected accounts
+    transactions = [
+        tx for tx in st.session_state['transactions']
+        if tx.get('account_id') in selected_accounts
+    ]
+
+    if not transactions:
+        st.warning("No transactions found for selected accounts.")
+        st.stop()
 
     # Initialize or reuse BudgetTracker
     if 'budget_tracker' not in st.session_state:
@@ -452,3 +468,8 @@ def show_budget_tracker():
 
         if not month_changed:  # Only rerun if button was clicked, not if month changed
             st.rerun()
+
+    # Check if we need to rerun due to account selection change
+    if st.session_state.get('account_selection_changed', False):
+        st.session_state.account_selection_changed = False
+        st.rerun()
