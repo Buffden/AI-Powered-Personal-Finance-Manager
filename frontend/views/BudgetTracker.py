@@ -277,7 +277,8 @@ def show_budget_tracker():
                 'spent': row['spent'],
                 'remaining': row['remaining'],
                 'percentage': row['percentage_spent'],
-                'overspent': row['overspent']
+                'overspent': row['overspent'],
+                'color_type': 'Budget'  # Add color type for budget bars
             })
             # Add spent bar data
             chart_data.append({
@@ -287,7 +288,8 @@ def show_budget_tracker():
                 'spent': row['spent'],
                 'remaining': row['remaining'],
                 'percentage': row['percentage_spent'],
-                'overspent': row['overspent']
+                'overspent': row['overspent'],
+                'color_type': 'Overspent' if row['overspent'] else 'Spent'  # Add color type for spent bars
             })
 
         # Convert to DataFrame
@@ -302,29 +304,28 @@ def show_budget_tracker():
 
         # Create the chart
         chart = alt.Chart(chart_df).mark_bar().encode(
-            # X-axis: Categories and bar types (Budget/Spent)
-            x=alt.X('type:N', title=None),
-            y=alt.Y('amount:Q', title='Amount ($)'),
+            x=alt.X('category:N', 
+                title=None,
+                sort=alt.SortField(field='amount', order='descending'),
+                axis=alt.Axis(
+                    labelAngle=-45,
+                    labelAlign='right',
+                    labelPadding=4
+                )
+            ),
+            y=alt.Y('amount:Q', 
+                title='Amount ($)',
+                axis=alt.Axis(grid=True)
+            ),
             xOffset=alt.XOffset(
                 "type:N",
-                spacing=5  # Adjust spacing between bars
+                title=None
             ),
-            column=alt.Column(
-                'category:N',
-                title=None,
-                header=alt.Header(
-                    labelAngle=-45,
-                    labelAlign='left',
-                    labelPadding=5
-                ),
-                sort=alt.SortField('amount', op='sum', order='descending')
-            ),
-            # Color based on type
             color=alt.Color(
-                'type:N',
+                'color_type:N',
                 scale=alt.Scale(
-                    domain=['Budget', 'Spent'],
-                    range=['#94A3B8', '#3B82F6']  # Darker grey for budget, Brighter blue for spent
+                    domain=['Budget', 'Spent', 'Overspent'],
+                    range=['#94A3B8', '#3B82F6', '#EF4444']
                 ),
                 legend=alt.Legend(
                     orient='top',
@@ -332,24 +333,7 @@ def show_budget_tracker():
                     labelFontSize=12
                 )
             ),
-            # Add conditional color for overspent categories
-            color=alt.condition(
-                'datum.type == "Spent" && datum.overspent',  # Condition for overspent amounts
-                alt.value('#EF4444'),  # Red color for overspent
-                alt.Color(
-                    'type:N',
-                    scale=alt.Scale(
-                        domain=['Budget', 'Spent'],
-                        range=['#94A3B8', '#3B82F6']  # Darker grey for budget, Brighter blue for spent
-                    ),
-                    legend=alt.Legend(
-                        orient='top',
-                        title=None,
-                        labelFontSize=12
-                    )
-                )
-            ),
-            opacity=alt.condition(highlight, alt.value(1), alt.value(0.9)),  # Increased base opacity
+            opacity=alt.condition(highlight, alt.value(1), alt.value(0.9)),
             tooltip=[
                 alt.Tooltip('category:N', title='Category'),
                 alt.Tooltip('type:N', title='Type'),
@@ -358,7 +342,7 @@ def show_budget_tracker():
                 alt.Tooltip('percentage:Q', title='% of Budget Used', format='.1f')
             ]
         ).properties(
-            width=80,  # Width of each category column
+            width=700,
             height=400
         ).add_selection(
             highlight
@@ -367,12 +351,8 @@ def show_budget_tracker():
         ).configure_axis(
             labelFontSize=12,
             titleFontSize=14,
-            grid=True,
             gridColor='#f0f0f0',
             domainColor='#ddd'
-        ).configure_header(
-            labelFontSize=12,
-            titleFontSize=14
         )
 
         # Add chart title and description
