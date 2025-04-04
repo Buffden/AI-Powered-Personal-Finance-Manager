@@ -51,8 +51,14 @@ def show_account_selector(show_title=True):
             else:
                 # Individual account checkboxes
                 for acc in bank_info['accounts']:
+                    # Create account label based on available fields
+                    if 'mask' in acc:
+                        account_label = f"{acc['name']} ({acc['type']}) - {acc['mask']}"
+                    else:
+                        account_label = f"{acc['name']} ({acc['type']})"
+                    
                     is_selected = st.checkbox(
-                        f"{acc['name']} ({acc['type']}) - {acc['mask']}",
+                        account_label,
                         value=st.session_state.selected_accounts.get(bank_id, {}).get(acc['account_id'], False),
                         key=f"account_{bank_id}_{acc['account_id']}"
                     )
@@ -92,12 +98,15 @@ def get_selected_accounts_summary():
     for bank_id, bank_info in st.session_state.linked_banks.items():
         for acc in bank_info['accounts']:
             if st.session_state.selected_accounts.get(bank_id, {}).get(acc['account_id'], False):
-                selected_data.append({
+                account_data = {
                     'Bank': bank_info['institution_name'],
                     'Account Name': acc['name'],
                     'Account Type': acc['type'],
-                    'Last 4 Digits': acc['mask'],
                     'Account ID': acc['account_id']
-                })
+                }
+                # Only add mask if it exists
+                if 'mask' in acc:
+                    account_data['Last 4 Digits'] = acc['mask']
+                selected_data.append(account_data)
     
     return pd.DataFrame(selected_data) if selected_data else None 
