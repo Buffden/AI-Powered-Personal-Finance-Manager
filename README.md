@@ -119,7 +119,7 @@ streamlit run frontend/streamlit_app.py
 ---
 
 ## 👥 Contributors
-- **Harshwardhan Patil** – Frontend, Dashboard, CI/CD
+- **Harshwardhan Patil** – Frontend, Dashboard, CI/CD, Plaid, OpenAI API
 - **Sanjana** – Backend Integrations, Alert System
 - **Matthew** – AI/ML & ChatGPT integration
 
