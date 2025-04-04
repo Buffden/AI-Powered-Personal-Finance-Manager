@@ -139,8 +139,8 @@ st.sidebar.markdown("""
 pages = [
     ("🏠", "Home", "home"),
     ("🏦", "Add Bank Account", "add_bank"),
-    ("📊", "Budget Tracking", "budget"),
     ("📈", "Spending Insights", "insights"),
+    ("📊", "Budget Tracking", "budget"),
     ("🔔", "Bill Reminders", "bills"),
     ("💬", "AI Financial Advisor", "chatbot")
 ]
