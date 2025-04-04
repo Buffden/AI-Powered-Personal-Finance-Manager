@@ -5,11 +5,27 @@ import altair as alt
 def show_insights():
     st.title("📊 Spending Insights – AI Finance Manager")
 
+    # Add Account Selector
+    from components.AccountSelector import show_account_selector
+    selected_accounts = show_account_selector()
+
+    if not selected_accounts:
+        st.warning("⚠️ Please select at least one account to view insights.")
+        st.stop()
+
     # ✅ Fetch transactions from session state
-    transactions = st.session_state.get("transactions", [])
+    if 'transactions' not in st.session_state:
+        st.warning("No transaction data found. Go to 'Home' and connect your bank first.")
+        st.stop()
+
+    # Filter transactions for selected accounts
+    transactions = [
+        tx for tx in st.session_state['transactions']
+        if tx.get('account_id') in selected_accounts
+    ]
 
     if not transactions:
-        st.warning("No transaction data found. Go to 'Home' and connect your bank first.")
+        st.warning("No transactions found for selected accounts.")
         st.stop()
 
     df = pd.DataFrame(transactions)
