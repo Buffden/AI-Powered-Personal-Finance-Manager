@@ -5,6 +5,7 @@ from components.AccountSelector import add_bank_to_state, show_account_selector
 import streamlit.components.v1 as components
 import pandas as pd
 import io
+import json
 
 def process_uploaded_statement(uploaded_file):
     """Process the uploaded bank statement and extract transactions."""
@@ -119,50 +120,43 @@ def show_add_bank_account():
     
     # Handle Plaid callback parameters
     status = st.query_params.get("status")
-    public_token = st.query_params.get("public_token")
-    institution_name = st.query_params.get("institution_name")
-    institution_id = st.query_params.get("institution_id")
+    tokens_str = st.query_params.get("tokens")
     
-    # Display Plaid callback information if available
-    if status == "success" and public_token and institution_name and institution_id:
-        st.success(f"✅ Successfully linked {institution_name}!")
-        
-        # Show public token in a copyable code block
-        st.info("🔑 Public Token:")
-        st.code(public_token, language=None)
-        
-        # Exchange public token for access token
-        st.info("🔄 Exchanging public token for access token...")
-        response = requests.post(
-            "http://localhost:5050/api/plaid/exchange_public_token",
-            json={
-                "public_token": public_token,
-                "institution_id": institution_id,
-                "institution_name": institution_name
-            }
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            access_token = data.get("access_token")
-            accounts = data.get("accounts", [])
+    # Process tokens if they exist
+    if status == "success" and tokens_str:
+        try:
+            tokens = json.loads(tokens_str)
+            st.success(f"✅ Successfully linked {len(tokens)} banks!")
             
-            # Register the bank and its accounts in session state
-            add_bank_to_state(institution_name, institution_id, accounts)
+            # Process all collected tokens
+            for token_info in tokens:
+                st.info(f"🔄 Processing {token_info['institution_name']}...")
+                response = requests.post(
+                    "http://localhost:5050/api/plaid/exchange_public_token",
+                    json=token_info
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    accounts = data.get("accounts", [])
+                    
+                    # Register the bank and its accounts in session state
+                    add_bank_to_state(
+                        token_info['institution_name'],
+                        token_info['institution_id'],
+                        accounts
+                    )
+                    st.success(f"✅ Successfully processed {token_info['institution_name']}")
+                else:
+                    st.error(f"❌ Failed to process {token_info['institution_name']}")
             
-            st.success("🔑 Access token generated successfully!")
-            st.code(access_token, language=None)
-            
-            # Clear the query parameters to avoid duplicate processing
-            current_page = st.query_params.get("page", "add_bank")
+            # Clear query parameters and refresh
             st.query_params.clear()
-            st.query_params["page"] = current_page
-            
-            # Force refresh the page to show new accounts
+            st.query_params["page"] = "add_bank_account"
             st.rerun()
-        else:
-            st.error("❌ Failed to exchange public token for access token.")
-            st.write("Debug: Error Response:", response.text)
+        
+        except Exception as e:
+            st.error(f"Error processing tokens: {str(e)}")
     elif status == "error":
         error = st.query_params.get("error")
         st.error(f"❌ Error: {error}")
@@ -179,16 +173,6 @@ def show_add_bank_account():
     # Tab 1: Manage Connected Banks
     with tab1:
         st.subheader("Connected Accounts")
-        
-        # Check if we need to refresh accounts after linking
-        status = st.query_params.get("status")
-        
-        # Force refresh accounts list if we just linked a new bank
-        if status == "success":
-            if "selected_accounts" in st.session_state:
-                del st.session_state.selected_accounts
-            st.rerun()
-        
         selected_accounts = show_account_selector(show_title=False)
         
         # Transaction Fetching Section
@@ -199,13 +183,13 @@ def show_add_bank_account():
             with col1:
                 start_date = st.date_input(
                     "Start Date",
-                    value=datetime(2025, 1, 1).date(),  # Set to January 1, 2025
+                    value=datetime(2025, 1, 1).date(),
                     help="Sandbox data is available from January 2025 to April 2025"
                 )
             with col2:
                 end_date = st.date_input(
                     "End Date",
-                    value=datetime(2025, 4, 30).date(),  # Set to April 30, 2025
+                    value=datetime(2025, 4, 30).date(),
                     help="Sandbox data is available from January 2025 to April 2025"
                 )
 
@@ -274,7 +258,6 @@ def show_add_bank_account():
     with tab2:
         st.info("💡 You can connect multiple bank accounts to get a complete view of your finances.")
         if st.button("Link New Bank Account", key="link_new_bank", use_container_width=True):
-            # Open the Flask endpoint in a new tab with redirect URL
             js = """
                 <script>
                     const redirectUrl = encodeURIComponent('http://localhost:8501/?page=add_bank_account');
@@ -292,7 +275,7 @@ def show_add_bank_account():
         # File uploader
         uploaded_file = st.file_uploader(
             "Choose a bank statement file",
-            type=["csv"],  # We'll add PDF/DOC support later
+            type=["csv"],
             help="Currently supporting CSV files. PDF and DOC support coming soon!"
         )
         

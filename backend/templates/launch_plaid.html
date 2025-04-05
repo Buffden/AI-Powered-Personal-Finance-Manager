@@ -22,6 +22,8 @@
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 90%;
         }
         .loading {
             margin: 1rem 0;
@@ -41,87 +43,166 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .success-message {
+            color: #28a745;
+            font-size: 1.2rem;
+            margin: 1rem 0;
+        }
+        .bank-count {
+            color: #6c757d;
+            margin: 1rem 0;
+        }
+        .button-container {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+        .button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .primary:hover {
+            background-color: #0056b3;
+        }
+        .secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .secondary:hover {
+            background-color: #545b62;
+        }
+        #add-more-prompt {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>AI Finance Manager</h2>
-        <div class="loading">Connecting to your bank...</div>
-        <div class="spinner"></div>
+        <div id="initial-content">
+            <div class="loading">Connecting to your bank...</div>
+            <div class="spinner"></div>
+        </div>
+        <div id="add-more-prompt" style="display: none;">
+            <div class="success-message">✅ Bank connected successfully!</div>
+            <div class="bank-count">🏦 Banks linked in this session: <span id="bank-count">0</span></div>
+            <p>Would you like to add another bank?</p>
+            <div class="button-container">
+                <button onclick="addAnotherBank()" class="button primary">Yes, Add Another</button>
+                <button onclick="finishLinking()" class="button secondary">No, I'm Done</button>
+            </div>
+        </div>
         <div id="status-message"></div>
     </div>
 
     <script>
-        // Update redirect URL to point to Add Bank Account page with institution info
+        // Store collected tokens
+        const collectedTokens = [];
         const BASE_URL = 'http://localhost:8501';
         const statusMessage = document.getElementById('status-message');
+        const initialContent = document.getElementById('initial-content');
+        const addMorePrompt = document.getElementById('add-more-prompt');
+        const bankCountElement = document.getElementById('bank-count');
 
         function updateStatus(message) {
             console.log(message);
             statusMessage.textContent = message;
         }
 
-        window.addEventListener('load', async function() {
+        function showAddMorePrompt() {
+            initialContent.style.display = 'none';
+            addMorePrompt.style.display = 'block';
+            bankCountElement.textContent = collectedTokens.length;
+        }
+
+        function addAnotherBank() {
+            // Hide the prompt and show loading
+            addMorePrompt.style.display = 'none';
+            initialContent.style.display = 'block';
+            
+            // Create and open new Plaid Link instance
+            initializePlaid();
+        }
+
+        function finishLinking() {
+            updateStatus('✅ Processing all connected banks...');
+            
+            // Redirect to Streamlit with all collected tokens
+            const redirectUrl = new URL(BASE_URL);
+            redirectUrl.searchParams.set('page', 'add_bank_account');
+            redirectUrl.searchParams.set('status', 'success');
+            redirectUrl.searchParams.set('tokens', JSON.stringify(collectedTokens));
+            
+            window.location.replace(redirectUrl.toString());
+        }
+
+        async function handlePlaidSuccess(public_token, metadata) {
+            updateStatus('✅ Bank connected! Processing...');
+            
+            try {
+                // Send public_token to backend
+                const response = await fetch('/api/plaid/handle-success', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        public_token: public_token,
+                        metadata: metadata
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to process bank connection');
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Store the token info
+                    collectedTokens.push({
+                        public_token: public_token,
+                        institution_id: metadata.institution.institution_id,
+                        institution_name: metadata.institution.name
+                    });
+                    
+                    // Show the "Add More?" prompt
+                    showAddMorePrompt();
+                } else {
+                    throw new Error(result.error || 'Failed to link bank');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                updateStatus('❌ Error: ' + error.message);
+                
+                // Redirect with error after delay
+                const redirectUrl = new URL(BASE_URL);
+                redirectUrl.searchParams.set('page', 'add_bank_account');
+                redirectUrl.searchParams.set('status', 'error');
+                redirectUrl.searchParams.set('error', error.message);
+                
+                setTimeout(() => {
+                    window.location.replace(redirectUrl.toString());
+                }, 2000);
+            }
+        }
+
+        function initializePlaid() {
             try {
                 updateStatus('Initializing Plaid Link...');
                 
                 const linkHandler = Plaid.create({
                     token: '{{ link_token }}',
-                    onSuccess: async function(public_token, metadata) {
-                        updateStatus('✅ Bank connected! Processing...');
-                        
-                        try {
-                            // Send public_token to backend
-                            const response = await fetch('/api/plaid/handle-success', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({ 
-                                    public_token: public_token,
-                                    metadata: metadata
-                                })
-                            });
-
-                            if (!response.ok) {
-                                throw new Error('Failed to process bank connection');
-                            }
-
-                            const result = await response.json();
-                            
-                            if (result.success) {
-                                updateStatus(`✅ Successfully linked ${metadata.institution.name}! Redirecting...`);
-                                
-                                // Add institution info to redirect URL
-                                const redirectUrl = new URL(BASE_URL);
-                                redirectUrl.searchParams.set('page', 'add_bank_account');
-                                redirectUrl.searchParams.set('institution_id', metadata.institution.institution_id);
-                                redirectUrl.searchParams.set('institution_name', metadata.institution.name);
-                                redirectUrl.searchParams.set('status', 'success');
-                                redirectUrl.searchParams.set('public_token', public_token);
-                                
-                                // Add a small delay to show the success message
-                                setTimeout(() => {
-                                    window.location.replace(redirectUrl.toString());
-                                }, 1500);
-                            } else {
-                                throw new Error(result.error || 'Failed to link bank');
-                            }
-                        } catch (error) {
-                            console.error('Error:', error);
-                            updateStatus('❌ Error: ' + error.message);
-                            
-                            // Redirect with error
-                            const redirectUrl = new URL(BASE_URL);
-                            redirectUrl.searchParams.set('page', 'add_bank_account');
-                            redirectUrl.searchParams.set('status', 'error');
-                            redirectUrl.searchParams.set('error', error.message);
-                            
-                            setTimeout(() => {
-                                window.location.replace(redirectUrl.toString());
-                            }, 2000);
-                        }
-                    },
+                    onSuccess: handlePlaidSuccess,
                     onExit: function(err, metadata) {
                         if (err != null) {
                             updateStatus('❌ Error: ' + err.message);
@@ -132,14 +213,17 @@
                             setTimeout(() => {
                                 window.location.replace(redirectUrl.toString());
                             }, 1500);
-                        } else {
-                            // User closed Plaid Link
+                        } else if (collectedTokens.length === 0) {
+                            // Only redirect if no banks have been added
                             const redirectUrl = new URL(BASE_URL);
                             redirectUrl.searchParams.set('page', 'add_bank_account');
                             redirectUrl.searchParams.set('status', 'cancelled');
                             setTimeout(() => {
                                 window.location.replace(redirectUrl.toString());
                             }, 1500);
+                        } else {
+                            // If banks were added, show the prompt again
+                            showAddMorePrompt();
                         }
                     },
                     onLoad: function() {
@@ -155,7 +239,10 @@
                 console.error('Error:', error);
                 updateStatus('❌ Error: ' + error.message);
             }
-        });
+        }
+
+        // Start the Plaid flow when page loads
+        window.addEventListener('load', initializePlaid);
     </script>
 </body>
 </html> 
