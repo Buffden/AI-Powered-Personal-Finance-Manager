@@ -91,25 +91,24 @@ def process_uploaded_statement(uploaded_file):
         return 0
 
 def add_bank_to_state(institution_name, institution_id, accounts):
-    """Helper function to add a bank and its accounts to session state"""
-    if 'linked_banks' not in st.session_state:
-        st.session_state.linked_banks = {}
-    
-    # Add or update the bank in session state with the correct structure
-    st.session_state.linked_banks[institution_id] = {
-        'institution_name': institution_name,  # This is what AccountSelector expects
-        'institution_id': institution_id,
-        'accounts': accounts
-    }
-    
-    # Initialize selection state for new accounts
-    if 'selected_accounts' not in st.session_state:
-        st.session_state.selected_accounts = {}
-    if institution_id not in st.session_state.selected_accounts:
-        st.session_state.selected_accounts[institution_id] = {
-            acc['account_id']: False for acc in accounts
-        }
-
+     """Helper function to add a bank and its accounts to session state"""
+     if 'linked_banks' not in st.session_state:
+         st.session_state.linked_banks = {}
+     
+     # Add or update the bank in session state with the correct structure
+     st.session_state.linked_banks[institution_id] = {
+         'institution_name': institution_name,  # This is what AccountSelector expects
+         'institution_id': institution_id,
+         'accounts': accounts
+     }
+     
+     # Initialize selection state for new accounts
+     if 'selected_accounts' not in st.session_state:
+         st.session_state.selected_accounts = {}
+     if institution_id not in st.session_state.selected_accounts:
+         st.session_state.selected_accounts[institution_id] = {
+             acc['account_id']: False for acc in accounts
+         }
 def show_add_bank_account():
     st.title("🏦 Connect Your Bank Account")
     
@@ -119,6 +118,7 @@ def show_add_bank_account():
     if 'transactions' not in st.session_state:
         st.session_state.transactions = []
     
+       
     # Handle Plaid callback parameters
     status = st.query_params.get("status")
     public_token = st.query_params.get("public_token")
@@ -171,6 +171,7 @@ def show_add_bank_account():
     elif status == "cancelled":
         st.info("ℹ️ Bank linking was cancelled.")
     
+
     # Create tabs for different methods
     tab1, tab2, tab3 = st.tabs([
         "📊 Manage Connected Banks",
@@ -260,6 +261,7 @@ def show_add_bank_account():
                             "Name": tx["name"],
                             "Amount ($)": tx["amount"],
                             "Category": ", ".join(tx.get("category", [])),
+                            "Account": f"{tx.get('account_name', '')} ({tx.get('mask', '')})" if tx.get('account_name') else "",
                             "Account": f"{tx.get('account_name', '')} ({tx.get('mask', '')})" if tx.get('account_name') else "",
                             "Source": tx.get("source", "unknown")
                         }

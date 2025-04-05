@@ -179,10 +179,14 @@ institution_name = st.query_params.get("institution_name")
 error = st.query_params.get("error")
 
 if status:
-    if status == "success":
+    if status == "success" and institution_name:
+        st.success(f"✅ Successfully linked {institution_name}!")
         # Update current page to add_bank
         st.session_state["current_page"] = "add_bank"
-        # Keep the query parameters for AddBankAccount.py to handle
+        # Clear status params but keep page param
+        current_page = st.query_params.get("page", "add_bank")
+        st.query_params.clear()
+        st.query_params["page"] = current_page
     elif status == "error" and error:
         st.error(f"❌ Error: {error}")
         st.session_state["current_page"] = "add_bank"
