@@ -9,24 +9,33 @@ import io
 def process_uploaded_statement(uploaded_file):
     """Process the uploaded bank statement and extract transactions."""
     try:
-        # For CSV files (we can extend this for PDF/DOC later)
         if uploaded_file.type == "text/csv":
             df = pd.read_csv(uploaded_file)
             
             # Standardize column names
             df.columns = [col.strip().lower() for col in df.columns]
-            
-            # Initialize transactions list if not exists
+
+            # Try to find a date column
+            possible_date_cols = ["date", "transaction date", "posted date"]
+            date_col = next((col for col in df.columns if col in possible_date_cols), None)
+
+            if not date_col:
+                st.error("No recognizable date column found in uploaded file.")
+                return 0
+
+            # Convert date column to datetime format
+            df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+            df.dropna(subset=[date_col], inplace=True)  # Remove rows with invalid dates
+
             if 'all_transactions' not in st.session_state:
                 st.session_state.all_transactions = []
-            
-            # Register manual upload account with AccountSelector if not already done
+
             manual_account = {
                 "account_id": "manual_upload",
                 "name": "Uploaded Statement",
                 "type": "other",
                 "subtype": "other",
-                "mask": "0000",  # Adding a default mask
+                "mask": "0000",
                 "official_name": "Manual CSV Upload",
                 "balances": {
                     "available": None,
@@ -35,27 +44,24 @@ def process_uploaded_statement(uploaded_file):
                     "iso_currency_code": "USD"
                 }
             }
-            
-            # Only add the manual account if it doesn't exist
+
             if ("manual" not in st.session_state.get("linked_banks", {}) or 
                 not any(acc["account_id"] == "manual_upload" 
-                       for acc in st.session_state.linked_banks.get("manual", {}).get("accounts", []))):
+                        for acc in st.session_state.linked_banks.get("manual", {}).get("accounts", []))):
                 add_bank_to_state("Manual Upload", "manual", [manual_account])
-            
-            # Convert DataFrame to list of transactions in Plaid-like format
+
             transactions = []
             for _, row in df.iterrows():
-                # Convert amount: positive = expense (debit), negative = income (credit)
                 amount = float(str(row["amount ($)"]).replace("$", "").replace(",", ""))
-                
-                # Create transaction in Plaid format
+                date_str = row[date_col].strftime("%Y-%m-%d")
+
                 transaction = {
                     "transaction_id": f"manual_{len(st.session_state.all_transactions) + len(transactions)}",
                     "account_id": "manual_upload",
                     "account_name": "Manual Upload",
                     "institution_id": "manual",
                     "institution_name": "Manual Upload",
-                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "date": date_str,
                     "name": row["vendor"],
                     "amount": amount,
                     "category": [row["category"]] if "category" in row else ["Uncategorized"],
@@ -65,9 +71,9 @@ def process_uploaded_statement(uploaded_file):
                     "transaction_type": "special",
                     "merchant_name": row["vendor"],
                     "source": "manual_upload",
-                    "authorized_date": datetime.now().strftime("%Y-%m-%d"),
-                    "authorized_datetime": datetime.now().isoformat(),
-                    "datetime": datetime.now().isoformat(),
+                    "authorized_date": date_str,
+                    "authorized_datetime": row[date_col].isoformat(),
+                    "datetime": row[date_col].isoformat(),
                     "payment_method": "other",
                     "payment_processor": None,
                     "personal_finance_category": {
@@ -76,13 +82,9 @@ def process_uploaded_statement(uploaded_file):
                     }
                 }
                 transactions.append(transaction)
-            
-            # Add new transactions to existing ones
+
             st.session_state.all_transactions.extend(transactions)
-            
-            # Update the main transactions list
             st.session_state.transactions = st.session_state.all_transactions.copy()
-            
             return len(transactions)
     except Exception as e:
         st.error(f"Error processing file: {str(e)}")
