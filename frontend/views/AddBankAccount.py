@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 from datetime import datetime, timedelta
-from components.AccountSelector import add_bank_to_state, show_account_selector
+from frontend.components.AccountSelector import add_bank_to_state, show_account_selector
 import streamlit.components.v1 as components
 import pandas as pd
 import io

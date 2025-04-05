@@ -1,8 +1,11 @@
 # frontend/app.py
 import streamlit as st
 import sys
+import os
 from pathlib import Path
-from views.AddBankAccount import show_add_bank_account
+from frontend.views.AddBankAccount import show_add_bank_account
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 # Add both frontend and project root to Python path
 frontend_path = Path(__file__).parent
@@ -165,12 +168,11 @@ for icon, label, page in pages:
 st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
 # Import views
-from views.Home import show_home
-from views.BudgetTracker import show_budget_tracker
-from views.Insights import show_insights
-from views.BillReminders import show_bill_reminders
-from views.Chatbot import show_chatbot
-from views.AddBankAccount import show_add_bank_account
+from frontend.views.Home import show_home
+from frontend.views.BudgetTracker import show_budget_tracker
+from frontend.views.Insights import show_insights
+from frontend.views.BillReminders import show_bill_reminders
+from frontend.views.Chatbot import show_chatbot
 
 # Handle Plaid callback status
 status = st.query_params.get("status")

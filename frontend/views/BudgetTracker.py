@@ -8,7 +8,7 @@ import datetime
 import openai
 from backend.utils.config import Config
 import json
-from components.AccountSelector import show_account_selector
+from frontend.components.AccountSelector import show_account_selector
 
 def categorize_transactions(transactions):
     """Use OpenAI to categorize transactions and suggest budgets."""

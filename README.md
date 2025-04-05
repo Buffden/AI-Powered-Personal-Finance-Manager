@@ -87,7 +87,9 @@ cd AI-Powered-Personal-Finance-Manager
 ### 2. Setup Python Environment
 ```bash
 python3 -m venv venv
-source venv/bin/activate
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass #If you get a permission denied error on Windows
+.\venv\Scripts\Activate #Windows
+source venv/bin/activate #Linux
 pip install -r requirements.txt
 ```
 
@@ -99,11 +101,13 @@ PLAID_SECRET=your-sandbox-secret
 
 ### 4. Run Backend
 ```bash
-python3 backend/flask_app.py
+python -m backend.flask_app
 ```
 
 ### 5. Run Frontend
+In a separate terminal that is also setup with steps 1-3, run:
 ```bash
+$env:PYTHONPATH="."
 streamlit run frontend/streamlit_app.py
 ```
 
