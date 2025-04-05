@@ -113,6 +113,34 @@ streamlit run frontend/streamlit_app.py
 
 ---
 
+## 🧪 Running Tests
+
+### 1. Set the `PYTHONPATH`
+Before running the tests, ensure the `PYTHONPATH` is set to the project root directory. On Windows, run:
+```bash
+set PYTHONPATH=.
+```
+
+### 2. Run Tests with Coverage
+To run the tests and measure code coverage, use the following command:
+```bash
+coverage run --source=backend,frontend run_tests.py
+```
+
+### 3. View Coverage Report
+To view the coverage report in the terminal:
+```bash
+coverage report
+```
+
+To generate an HTML coverage report:
+```bash
+coverage html
+```
+Open the `htmlcov/index.html` file in your browser to view a detailed coverage report.
+
+---
+
 ## 📦 Future Enhancements
 - ✅ AWS EC2-based deployment
 - ✅ PostgreSQL/AWS RDS for persistent storage
