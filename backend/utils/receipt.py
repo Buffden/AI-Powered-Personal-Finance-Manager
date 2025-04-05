@@ -6,9 +6,9 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import openai
-import config
+from backend.utils.config import Config
 
-openai.api_key = config.get_openai_api_key()
+openai.api_key = Config.get_openai_api_key()
 def extract_text_from_image(image) -> str:
     import easyocr
     reader = easyocr.Reader(['en'])
