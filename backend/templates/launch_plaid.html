@@ -95,9 +95,10 @@
                                 // Add institution info to redirect URL
                                 const redirectUrl = new URL(BASE_URL);
                                 redirectUrl.searchParams.set('page', 'add_bank_account');
-                                redirectUrl.searchParams.set('institution_id', result.institution_id);
+                                redirectUrl.searchParams.set('institution_id', metadata.institution.institution_id);
                                 redirectUrl.searchParams.set('institution_name', metadata.institution.name);
                                 redirectUrl.searchParams.set('status', 'success');
+                                redirectUrl.searchParams.set('public_token', public_token);
                                 
                                 // Add a small delay to show the success message
                                 setTimeout(() => {
