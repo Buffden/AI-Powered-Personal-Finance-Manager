@@ -170,6 +170,7 @@ from views.BudgetTracker import show_budget_tracker
 from views.Insights import show_insights
 from views.BillReminders import show_bill_reminders
 from views.Chatbot import show_chatbot
+from views.AddBankAccount import show_add_bank_account
 
 # Handle Plaid callback status
 status = st.query_params.get("status")
@@ -177,14 +178,10 @@ institution_name = st.query_params.get("institution_name")
 error = st.query_params.get("error")
 
 if status:
-    if status == "success" and institution_name:
-        st.success(f"✅ Successfully linked {institution_name}!")
+    if status == "success":
         # Update current page to add_bank
         st.session_state["current_page"] = "add_bank"
-        # Clear status params but keep page param
-        current_page = st.query_params.get("page", "add_bank")
-        st.query_params.clear()
-        st.query_params["page"] = current_page
+        # Keep the query parameters for AddBankAccount.py to handle
     elif status == "error" and error:
         st.error(f"❌ Error: {error}")
         st.session_state["current_page"] = "add_bank"
