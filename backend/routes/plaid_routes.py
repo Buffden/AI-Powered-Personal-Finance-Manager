@@ -277,3 +277,28 @@ def handle_plaid_success():
         print("Error handling Plaid success:", str(e))
         return jsonify({"error": str(e)}), 500
 
+
+from plaid.model.identity_get_request import IdentityGetRequest
+
+@plaid_bp.route("/api/plaid/get_user_email", methods=["GET"])
+def get_user_email():
+    access_token = ACCESS_TOKENS.get("demo-user-123")
+    if not access_token:
+        return jsonify({"error": "No access token"}), 400
+
+    try:
+        request = IdentityGetRequest(access_token=access_token)
+        response = client.identity_get(request)
+        identities = response.accounts
+
+        # Try to get email from first owner
+        for account in identities:
+            if account.owners:
+                for owner in account.owners:
+                    if owner.emails:
+                        return jsonify({"email": owner.emails[0].data})
+
+        return jsonify({"email": "fallback_user@example.com"})  # fallback
+
+    except Exception as e:
+        return jsonify({"email": "fallback_user@example.com"})  # fallback
