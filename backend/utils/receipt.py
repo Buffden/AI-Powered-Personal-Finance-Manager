@@ -7,6 +7,7 @@ import numpy as np
 import streamlit as st
 import openai
 import config
+
 openai.api_key = config.get_openai_api_key()
 def extract_text_from_image(image) -> str:
     import easyocr
