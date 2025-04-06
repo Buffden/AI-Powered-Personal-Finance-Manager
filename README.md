@@ -93,10 +93,11 @@ source venv/bin/activate #Linux
 pip install -r requirements.txt
 ```
 
-### 3. Add Plaid API Keys in `.env`
+### 3. Add API Keys to `.env`
 ```
 PLAID_CLIENT_ID=your-client-id
 PLAID_SECRET=your-sandbox-secret
+OPENAI_API_KEY=your-api-key
 ```
 
 ### 4. Run Backend
@@ -153,7 +154,7 @@ Open the `htmlcov/index.html` file in your browser to view a detailed coverage r
 ## 👥 Contributors
 - **Harshwardhan Patil** – Frontend, Dashboard, CI/CD, Plaid, OpenAI API
 - **Sanjana** – Backend Integrations, Alert System
-- **Matthew** – AI/ML & ChatGPT integration
+- **Matthew** – AI/ML & ChatGPT integration, Automation Testing
 
 ---
 

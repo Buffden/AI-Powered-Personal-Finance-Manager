@@ -8,86 +8,33 @@ import io
 import json
 
 def process_uploaded_statement(uploaded_file):
-    """Process the uploaded bank statement and extract transactions."""
-    try:
-        # For CSV files (we can extend this for PDF/DOC later)
-        if uploaded_file.type == "text/csv":
-            df = pd.read_csv(uploaded_file)
-            
-            # Standardize column names
-            df.columns = [col.strip().lower() for col in df.columns]
-            
-            # Initialize transactions list if not exists
-            if 'all_transactions' not in st.session_state:
-                st.session_state.all_transactions = []
-            
-            # Register manual upload account with AccountSelector if not already done
-            manual_account = {
-                "account_id": "manual_upload",
-                "name": "Uploaded Statement",
-                "type": "other",
-                "subtype": "other",
-                "mask": "0000",  # Adding a default mask
-                "official_name": "Manual CSV Upload",
-                "balances": {
-                    "available": None,
-                    "current": None,
-                    "limit": None,
-                    "iso_currency_code": "USD"
-                }
-            }
-            
-            # Only add the manual account if it doesn't exist
-            if ("manual" not in st.session_state.get("linked_banks", {}) or 
-                not any(acc["account_id"] == "manual_upload" 
-                       for acc in st.session_state.linked_banks.get("manual", {}).get("accounts", []))):
-                add_bank_to_state("Manual Upload", "manual", [manual_account])
-            
-            # Convert DataFrame to list of transactions in Plaid-like format
-            transactions = []
-            for _, row in df.iterrows():
-                # Convert amount: positive = expense (debit), negative = income (credit)
-                amount = float(str(row["amount ($)"]).replace("$", "").replace(",", ""))
-                
-                # Create transaction in Plaid format
-                transaction = {
-                    "transaction_id": f"manual_{len(st.session_state.all_transactions) + len(transactions)}",
-                    "account_id": "manual_upload",
-                    "account_name": "Manual Upload",
-                    "institution_id": "manual",
-                    "institution_name": "Manual Upload",
-                    "date": datetime.now().strftime("%Y-%m-%d"),
-                    "name": row["vendor"],
-                    "amount": amount,
-                    "category": [row["category"]] if "category" in row else ["Uncategorized"],
-                    "category_id": "manual",
-                    "pending": False,
-                    "payment_channel": "other",
-                    "transaction_type": "special",
-                    "merchant_name": row["vendor"],
-                    "source": "manual_upload",
-                    "authorized_date": datetime.now().strftime("%Y-%m-%d"),
-                    "authorized_datetime": datetime.now().isoformat(),
-                    "datetime": datetime.now().isoformat(),
-                    "payment_method": "other",
-                    "payment_processor": None,
-                    "personal_finance_category": {
-                        "primary": row["category"] if "category" in row else "Uncategorized",
-                        "detailed": row["category"] if "category" in row else "Uncategorized"
-                    }
-                }
-                transactions.append(transaction)
-            
-            # Add new transactions to existing ones
-            st.session_state.all_transactions.extend(transactions)
-            
-            # Update the main transactions list
-            st.session_state.transactions = st.session_state.all_transactions.copy()
-            
-            return len(transactions)
-    except Exception as e:
-        st.error(f"Error processing file: {str(e)}")
+    if uploaded_file.type != "text/csv":
         return 0
+
+    try:
+        df = pd.read_csv(uploaded_file)
+    except Exception as e:
+        st.error(f"Failed to read CSV: {str(e)}")
+        return 0
+
+    if "vendor" not in df.columns or "amount ($)" not in df.columns:
+        st.error("Missing required columns.")
+        return 0
+
+    transactions = []
+    for _, row in df.iterrows():
+        transaction = {
+            "name": row["vendor"],
+            "amount": row["amount ($)"]
+        }
+        # Add category if it exists
+        if "category" in df.columns:
+            transaction["category"] = row["category"]
+        transactions.append(transaction)
+
+    st.session_state["transactions"] = transactions
+    return len(transactions)
+
 
 def add_bank_to_state(institution_name, institution_id, accounts):
     """Helper function to add a bank and its accounts to session state"""

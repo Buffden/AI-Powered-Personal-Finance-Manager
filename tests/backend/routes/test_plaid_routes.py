@@ -56,15 +56,26 @@ class TestPlaidRoutes(unittest.TestCase):
 
     @patch("backend.routes.plaid_routes.client.transactions_get")
     def test_get_transactions_success(self, mock_transactions_get):
-        mock_transactions_get.return_value = Mock(
-            to_dict=lambda: {
-                "transactions": [
-                    {"id": "transaction_1", "institution_id": "mocked_institution_id"}
-                ]
-            }
-        )
-        response = self.client.post("/api/plaid/get_transactions", json={"account_ids": ["mocked_account_id"]})
-        self.assertEqual(response.json, [{"id": "transaction_1", "institution_id": "mocked_institution_id"}])
+        from backend.routes.plaid_routes import ACCESS_TOKENS
+        ACCESS_TOKENS["demo-user-123"] = {"mocked_institution_id": "mocked_access_token"}
+
+        mock_transactions_get.return_value.to_dict.return_value = {
+            "transactions": [
+                {"id": "transaction_1"}
+            ],
+            "accounts": []
+        }
+
+        response = self.client.post("/api/plaid/get_transactions", json={
+            "account_ids": ["mocked_account_id"],
+            "start_date": "2025-01-01",
+            "end_date": "2025-01-31"
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["transactions"][0]["id"], "transaction_1")
+        self.assertEqual(response.json["transactions"][0]["institution_id"], "mocked_institution_id")
+
 
     def test_get_transactions_no_access_tokens(self):
         """Test the /api/plaid/get_transactions endpoint with no access tokens."""
