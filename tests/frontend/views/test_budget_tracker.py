@@ -11,21 +11,24 @@ from frontend.views import BudgetTracker as bt
 
 class TestCategorizeTransactions(unittest.TestCase):
     @patch("frontend.views.BudgetTracker.Config.get_openai_api_key", return_value="fake-key")
-    @patch("frontend.views.BudgetTracker.openai.ChatCompletion.create")
+    @patch("frontend.views.BudgetTracker.OpenAI")
     @patch("frontend.views.BudgetTracker.st")
-    def test_valid_transactions_categorized(self, mock_st, mock_create, mock_key):
-        # Mock response from OpenAI
-        mock_create.return_value.choices = [MagicMock(message=MagicMock(content='''{
-            "categories": {
-                "Food": {
-                    "transactions": [
-                        {"name": "Starbucks", "amount": 10.0, "date": "2023-07-01"}
-                    ],
-                    "suggested_budget": 50,
-                    "description": "Covers small food purchases"
+    def test_valid_transactions_categorized(self, mock_st, mock_openai, mock_key):
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.chat.completions.create.return_value.choices = [
+            MagicMock(message=MagicMock(content='''{
+                "categories": {
+                    "Food": {
+                        "transactions": [
+                            {"name": "Starbucks", "amount": 10.0, "date": "2023-07-01"}
+                        ],
+                        "suggested_budget": 50,
+                        "description": "Covers small food purchases"
+                    }
                 }
-            }
-        }'''))]
+            }'''))
+        ]
 
         transactions = [
             {"name": "Starbucks", "amount": "10.0", "date": "2023-07-01", "category": ["Coffee"]}
@@ -37,32 +40,41 @@ class TestCategorizeTransactions(unittest.TestCase):
         self.assertEqual(result["Food"]["transactions"][0]["name"], "Starbucks")
 
     @patch("frontend.views.BudgetTracker.Config.get_openai_api_key", return_value="fake-key")
-    @patch("frontend.views.BudgetTracker.openai.ChatCompletion.create")
+    @patch("frontend.views.BudgetTracker.OpenAI")
     @patch("frontend.views.BudgetTracker.st")
-    def test_openai_returns_invalid_json(self, mock_st, mock_create, mock_key):
-        mock_create.return_value.choices = [MagicMock(message=MagicMock(content='not a json'))]
+    def test_openai_returns_invalid_json(self, mock_st, mock_openai, mock_key):
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.chat.completions.create.return_value.choices = [
+            MagicMock(message=MagicMock(content='not a json'))
+        ]
 
         result = bt.categorize_transactions([{"name": "X", "amount": "1", "date": "2023-07-01"}])
         self.assertEqual(result, {})
         mock_st.error.assert_called_once()
 
     @patch("frontend.views.BudgetTracker.Config.get_openai_api_key", return_value="fake-key")
-    @patch("frontend.views.BudgetTracker.openai.ChatCompletion.create", side_effect=Exception("OpenAI error"))
+    @patch("frontend.views.BudgetTracker.OpenAI")
     @patch("frontend.views.BudgetTracker.st")
-    def test_openai_raises_exception(self, mock_st, mock_create, mock_key):
+    def test_openai_raises_exception(self, mock_st, mock_openai, mock_key):
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.chat.completions.create.side_effect = Exception("OpenAI error")
+
         result = bt.categorize_transactions([{"name": "X", "amount": "1", "date": "2023-07-01"}])
         self.assertEqual(result, {})
         mock_st.error.assert_called_once()
 
 class TestAnalyzeTransactionsForBudgets(unittest.TestCase):
     @patch("frontend.views.BudgetTracker.Config.get_openai_api_key", return_value="fake-key")
-    @patch("frontend.views.BudgetTracker.openai.ChatCompletion.create")
+    @patch("frontend.views.BudgetTracker.OpenAI")
     @patch("frontend.views.BudgetTracker.st")
-    def test_budget_suggestions_parsed_correctly(self, mock_st, mock_create, mock_key):
-        mock_create.return_value.choices = [MagicMock(message=MagicMock(content="""
-            Food: $150
-            Rent: $1200
-        """))]
+    def test_budget_suggestions_parsed_correctly(self, mock_st, mock_openai, mock_key):
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.chat.completions.create.return_value.choices = [
+            MagicMock(message=MagicMock(content="Food: $150\nRent: $1200"))
+        ]
 
         categorized = {
             "Food": {"transactions": [], "suggested_budget": 0},
@@ -74,9 +86,13 @@ class TestAnalyzeTransactionsForBudgets(unittest.TestCase):
         self.assertEqual(result["Rent"], 1200)
 
     @patch("frontend.views.BudgetTracker.Config.get_openai_api_key", return_value="fake-key")
-    @patch("frontend.views.BudgetTracker.openai.ChatCompletion.create", side_effect=Exception("Boom"))
+    @patch("frontend.views.BudgetTracker.OpenAI")
     @patch("frontend.views.BudgetTracker.st")
-    def test_analyze_budget_openai_failure(self, mock_st, mock_create, mock_key):
+    def test_analyze_budget_openai_failure(self, mock_st, mock_openai, mock_key):
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.chat.completions.create.side_effect = Exception("Boom")
+
         result = bt.analyze_transactions_for_budgets({})
         self.assertEqual(result, {})
         mock_st.error.assert_called_once()
