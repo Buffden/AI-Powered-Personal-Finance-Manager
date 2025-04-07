@@ -54,6 +54,8 @@ AI-Powered-Personal-Finance-Manager/
 ├── backend/
 │   ├── flask_app.py
 │   ├── routes/
+│   |   ├── ai_routes.py
+│   |   ├── bill_routes.py
 │   │   └── plaid_routes.py
 │   └── utils/
 │       ├── budget.py
@@ -70,8 +72,21 @@ AI-Powered-Personal-Finance-Manager/
 │       ├── Insights.py
 │       ├── AddBankAccount.py
 │       └── Chatbot.py
+├── tests/
+|   ├── backend/
+|   │   ├── test_flask_app.py
+|   │   └── routes/
+│   |       ├── test_bill_routes.py
+|   │       └── test_plaid_routes.py
+|   └── frontend/
+|       ├── test_streamlit_app.py
+|       └── views/
+|           ├── test_add_bank_account.py
+|           ├── test_budget_tracker.py
+|           └── test_chatbot.py
 ├── .env
-└── requirements.txt
+├── requirements.txt
+└── run_test.py
 ```
 
 ---
