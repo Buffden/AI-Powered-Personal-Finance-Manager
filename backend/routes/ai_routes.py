@@ -1,13 +1,8 @@
 # backend/routes/ai_routes.py
-from flask import Blueprint, jsonify
-import streamlit as st
+from flask import Blueprint
 import openai
-import re
-import json
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/api/ai")
-
-@ai_bp.route("/test", methods=["GET"])
 
 def transactions_to_text(transactions):
     return "\n".join([
@@ -15,38 +10,36 @@ def transactions_to_text(transactions):
         for tx in transactions
     ])
 
-import openai
-
 def chat_with_advisor(api_key, transactions, conversation_history, user_input, user_goals=None):
     openai.api_key = api_key
 
     if not conversation_history:
+        # Inject data ONLY into the system prompt
         transaction_text = transactions_to_text(transactions)
         intro = f"User's financial goals: {user_goals}" if user_goals else ""
 
-        # Only system prompt + user’s visible message
         conversation_history = [
             {
                 "role": "system",
                 "content": (
-                    "You are an AI-powered financial advisor. Use the transaction data provided (not shown to the user) "
-                    "to offer clear advice on spending, saving, budgeting, and financial planning."
+                    f"You are an AI-powered financial advisor.\n\n"
+                    f"{intro}\n\n"
+                    "Here is the user's transaction data:\n"
+                    f"{transaction_text}\n\n"
+                    "Use this data to provide personalized financial advice, including:\n"
+                    "- Spending insights\n"
+                    "- Budget suggestions\n"
+                    "- Credit score improvement strategies (e.g., reducing high-interest spending, paying on time, avoiding overdrafts, maintaining low credit utilization)"
                 )
+            },
+            {
+                "role": "user",
+                "content": "Can you review my spending and give me financial advice?"
             }
         ]
 
-        # Inject transactions invisibly for GPT, but not shown in chat
-        user_prompt = (
-            f"{intro}\n\nHere is the user's transaction data:\n{transaction_text}\n\n"
-            "Now provide personalized financial advice."
-        )
-        conversation_history.append({"role": "user", "content": user_prompt})
-
-        # Add visible message in chat as if user just said "Give me advice"
-        conversation_history.append({"role": "user", "content": "Can you review my spending and give me financial advice?"})
-
     else:
-        # Follow-up question
+        # Follow-up questions
         conversation_history.append({"role": "user", "content": user_input})
 
     response = openai.ChatCompletion.create(
@@ -58,3 +51,4 @@ def chat_with_advisor(api_key, transactions, conversation_history, user_input, u
     conversation_history.append({"role": "assistant", "content": reply})
 
     return reply, conversation_history
+

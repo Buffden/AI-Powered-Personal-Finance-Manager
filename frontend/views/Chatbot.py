@@ -29,12 +29,17 @@ def show_chatbot():
             # Start chat on button press
             if not st.session_state.chat_started and st.button("🚀 Start Financial Advice Chat"):
                 with st.spinner("Analyzing your transactions..."):
+                    default_goals = (
+                        "Improve my credit score by reducing unnecessary expenses, ensuring timely payments, "
+                        "and optimizing credit utilization across categories like shopping, dining, bills, and subscriptions."
+                    )
+
                     initial_reply, history = chat_with_advisor(
                         api_key=api_key,
                         transactions=transactions,
                         conversation_history=[],
-                        user_input="Provide financial advice based on my transactions.",
-                        user_goals=user_goals
+                        user_input="Provide financial advice based on my transactions. Include suggestions for improving my credit score.",
+                        user_goals=user_goals or default_goals
                     )
                     st.session_state.conversation_history = history
                     st.session_state.chat_started = True
