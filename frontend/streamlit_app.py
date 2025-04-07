@@ -143,7 +143,8 @@ pages = [
     ("📈", "Spending Insights", "insights"),
     ("📊", "Budget Tracking", "budget"),
     ("🔔", "Bill Reminders", "bills"),
-    ("💬", "AI Financial Advisor", "chatbot")
+    ("💬", "AI Financial Advisor", "chatbot"),
+    ("📸", "Receipt Parser", "receiptparser")
 ]
 
 st.sidebar.markdown('<div class="nav-wrapper">', unsafe_allow_html=True)
@@ -170,7 +171,7 @@ from views.BudgetTracker import show_budget_tracker
 from views.Insights import show_insights
 from views.BillReminders import show_bill_reminders
 from views.Chatbot import show_chatbot
-from views.AddBankAccount import show_add_bank_account
+from views.ReceiptParser import show_receipt_parser
 
 # Handle Plaid callback status
 status = st.query_params.get("status")
@@ -178,10 +179,14 @@ institution_name = st.query_params.get("institution_name")
 error = st.query_params.get("error")
 
 if status:
-    if status == "success":
+    if status == "success" and institution_name:
+        st.success(f"✅ Successfully linked {institution_name}!")
         # Update current page to add_bank
         st.session_state["current_page"] = "add_bank"
-        # Keep the query parameters for AddBankAccount.py to handle
+        # Clear status params but keep page param
+        current_page = st.query_params.get("page", "add_bank")
+        st.query_params.clear()
+        st.query_params["page"] = current_page
     elif status == "error" and error:
         st.error(f"❌ Error: {error}")
         st.session_state["current_page"] = "add_bank"
@@ -208,3 +213,5 @@ elif st.session_state["current_page"] == "bills":
     show_bill_reminders()
 elif st.session_state["current_page"] == "chatbot":
     show_chatbot()
+elif st.session_state["current_page"] == "receiptparser":
+    show_receipt_parser()
