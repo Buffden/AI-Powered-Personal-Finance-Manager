@@ -1,7 +1,10 @@
-from dateutil import parser as date_parser
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from collections import defaultdict
+from calendar import monthrange
+import re
+import streamlit as st
 
+# --- STEP 1: Budget Overspending Alerts ---
 def generate_notifications(overspending_summary, year_month):
     notifications = []
     for category, exceeded_amount in overspending_summary.items():
@@ -13,57 +16,88 @@ def generate_notifications(overspending_summary, year_month):
         notifications.append(notification)
     return notifications
 
-def detect_recurring_payments(transactions):
-    recurring = defaultdict(list)
+# --- Normalize merchant name (strip special chars & lowercase) ---
+def normalize_name(name):
+    return re.sub(r'[^a-z]', '', name.lower())
 
+# --- STEP 2: Detect Recurring Transactions ---
+def detect_recurring_transactions(transactions):
+    recurring = []
+
+    grouped = defaultdict(list)
     for tx in transactions:
-        key = (tx.get("name", ""), tx.get("category", ["Uncategorized"])[0])
-        recurring[key].append({
-            "amount": abs(tx["amount"]),
-            "date": date_parser.parse(tx["date"])
-        })
+        try:
+            norm_name = normalize_name(tx["name"])
+            amount = round(float(tx["amount"]), 2)
+            tx_date = datetime.strptime(tx["date"], "%Y-%m-%d").date()
+            key = (norm_name, amount)
+            grouped[key].append((tx_date, tx))
+        except:
+            continue
 
-    candidates = []
+    for (norm_name, amount), entries in grouped.items():
+        if len(entries) < 3:
+            continue
 
-    for (name, category), tx_list in recurring.items():
-        if len(tx_list) < 3:
-            continue  # At least 3 payments needed for pattern
+        entries.sort(key=lambda x: x[0])
+        day_set = set(entry[0].day for entry in entries)
 
-        # Sort by date
-        tx_list.sort(key=lambda x: x["date"])
+        if len(day_set) == 1:
+            recurring_day = entries[-1][0].day
+            today = date.today()
+            year = today.year
+            month = today.month
 
-        # Check for ~monthly interval
-        intervals = [
-            (tx_list[i + 1]["date"] - tx_list[i]["date"]).days
-            for i in range(len(tx_list) - 1)
-        ]
-        avg_interval = sum(intervals) / len(intervals)
+            if today.day < recurring_day:
+                next_due_month = month
+                next_due_year = year
+            else:
+                next_due_month = month + 1
+                next_due_year = year
+                if next_due_month > 12:
+                    next_due_month = 1
+                    next_due_year += 1
 
-        if 27 <= avg_interval <= 33:
-            recent_date = tx_list[-1]["date"]
-            avg_amount = sum(tx["amount"] for tx in tx_list) / len(tx_list)
-            candidates.append({
-                "name": name,
-                "category": category,
-                "last_paid": recent_date,
-                "average_amount": round(avg_amount, 2),
-                "next_due": recent_date + timedelta(days=30)
+            max_day = monthrange(next_due_year, next_due_month)[1]
+            due_day = min(recurring_day, max_day)
+            next_due = date(next_due_year, next_due_month, due_day)
+
+            recurring.append({
+                "name": entries[-1][1]["name"],
+                "category": entries[-1][1].get("category", ["Other"])[0],
+                "amount": amount,
+                "next_due": next_due
             })
 
-    return candidates
+    return recurring
 
-def generate_bill_reminders(recurring_candidates):
-    today = datetime.today().date()
+# --- STEP 3: Generate Sorted, Multi-Month Reminders ---
+def generate_bill_reminders(recurring_candidates, days_ahead=5):
+    today = date.today()
+    end_date = today + timedelta(days=days_ahead)
     reminders = []
 
     for item in recurring_candidates:
-        due_date = item["next_due"].date()
-        if 0 <= (due_date - today).days <= 5:
-            reminders.append({
-                "name": item["name"],
-                "category": item["category"],
-                "due_date": due_date.isoformat(),
-                "message": f"📅 Upcoming bill: **{item['name']}** (${item['average_amount']}) is due on {due_date}."
-            })
+        due_date = item["next_due"]
 
+        while due_date <= end_date:
+            if due_date >= today:
+                reminders.append({
+                    "name": item["name"],
+                    "category": item["category"],
+                    "amount": item["amount"],
+                    "due_date": due_date.isoformat(),
+                    "message": f"📅 Recurring payment: **{item['name']}** (${item['amount']}) occurs monthly on day {due_date.day}. Next due: {due_date}."
+                })
+
+            year, month = due_date.year, due_date.month + 1
+            if month > 12:
+                month = 1
+                year += 1
+
+            max_day = monthrange(year, month)[1]
+            next_day = min(item["next_due"].day, max_day)
+            due_date = date(year, month, next_day)
+
+    reminders.sort(key=lambda r: r["due_date"])
     return reminders
