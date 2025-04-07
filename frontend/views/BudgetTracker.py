@@ -4,7 +4,6 @@ from backend.utils.notifications import generate_notifications
 import pandas as pd
 import altair as alt
 from dateutil import parser as date_parser
-import datetime
 import openai
 from backend.utils.config import Config
 import json
@@ -277,10 +276,15 @@ def show_budget_tracker():
 
         # Convert summary to DataFrame for Altair
         df = pd.DataFrame(summary)
-        df['overspent'] = df['spent'] > df['limit']
-        df['remaining'] = df['limit'] - df['spent']
-        df['remaining'] = df['remaining'].clip(lower=0)
-        df['percentage_spent'] = (df['spent'] / df['limit'] * 100).round(1)
+        required_cols = {'spent', 'limit'}
+        if required_cols.issubset(df.columns):
+            df['overspent'] = df['spent'] > df['limit']
+            df['remaining'] = df['limit'] - df['spent']
+            df['remaining'] = df['remaining'].clip(lower=0)
+            df['percentage_spent'] = (df['spent'] / df['limit'] * 100).round(1)
+        else:
+            st.error("Data is missing 'spent' or 'limit' values. Cannot compute overspending.")
+            st.stop()
 
         # Prepare data for side-by-side bars
         chart_data = []

@@ -1,6 +1,5 @@
 import streamlit as st
 from backend.utils.notifications import detect_recurring_payments, generate_bill_reminders
-from datetime import datetime
 
 def show_bill_reminders():
     st.title("🔔 Budget Alerts & Bill Reminders")

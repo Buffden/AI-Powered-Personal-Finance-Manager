@@ -1,10 +1,9 @@
 import streamlit as st
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from frontend.components.AccountSelector import add_bank_to_state, show_account_selector
 import streamlit.components.v1 as components
 import pandas as pd
-import io
 import json
 
 def process_uploaded_statement(uploaded_file):

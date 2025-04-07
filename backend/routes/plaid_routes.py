@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for
+from flask import Blueprint, request, jsonify, render_template, redirect
 from dotenv import load_dotenv
 import os
 from plaid.api import plaid_api
@@ -10,7 +10,7 @@ from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchan
 from plaid.model.transactions_get_request import TransactionsGetRequest
 from plaid.model.transactions_get_request_options import TransactionsGetRequestOptions
 from plaid import Configuration, ApiClient
-from datetime import datetime, timedelta
+from datetime import datetime
 from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid.model.link_token_create_request_update import LinkTokenCreateRequestUpdate
 

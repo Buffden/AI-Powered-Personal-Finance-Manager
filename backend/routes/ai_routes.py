@@ -1,9 +1,6 @@
 # backend/routes/ai_routes.py
-from flask import Blueprint, jsonify
-import streamlit as st
-import openai
-import re
-import json
+from flask import Blueprint
+from openai import OpenAI
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/api/ai")
 
@@ -15,10 +12,8 @@ def transactions_to_text(transactions):
         for tx in transactions
     ])
 
-import openai
-
 def chat_with_advisor(api_key, transactions, conversation_history, user_input, user_goals=None):
-    openai.api_key = api_key
+    client = OpenAI(api_key=api_key)
 
     if not conversation_history:
         transaction_text = transactions_to_text(transactions)
@@ -49,12 +44,13 @@ def chat_with_advisor(api_key, transactions, conversation_history, user_input, u
         # Follow-up question
         conversation_history.append({"role": "user", "content": user_input})
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=conversation_history
     )
 
-    reply = response["choices"][0]["message"]["content"]
+
+    reply = response.choices[0].message.content
     conversation_history.append({"role": "assistant", "content": reply})
 
     return reply, conversation_history
