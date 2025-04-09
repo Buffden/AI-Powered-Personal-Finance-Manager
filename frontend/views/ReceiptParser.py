@@ -3,7 +3,14 @@ import numpy as np
 from PIL import Image
 from io import BytesIO
 from datetime import datetime
-from backend.utils.receipt_parser import extract_text_from_image, extract_receipt_fields, add_transaction_to_state
+import pandas as pd
+from backend.utils.receipt_parser import (
+    extract_text_from_image,
+    extract_receipt_fields,
+    add_transaction_to_state,
+    categorize_transaction,
+    delete_receipt_transaction
+)
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 
 def show_receipt_parser():
@@ -14,23 +21,81 @@ def show_receipt_parser():
         st.session_state["webcam_capture_requested"] = False
 
     st.title("📸 Receipt Scanner")
-    tab1, tab2 = st.tabs(["📁 Upload Receipt", "📷 Scan via Webcam"])
+    tab1, tab2 = st.tabs(["📁 Upload Receipts", "📷 Scan via Webcam"])
 
-    # ========== 📁 Upload Receipt Tab ==========
+    # ========== 📁 Upload Receipts Tab ==========
     with tab1:
-        uploaded_file = st.file_uploader("Upload a receipt image", type=["jpg", "jpeg", "png"])
-        if uploaded_file:
-            st.image(uploaded_file, caption="📎 Uploaded Receipt", width=300)
-            with st.spinner("🔍 Extracting text..."):
-                text = extract_text_from_image(uploaded_file)
-                vendor, amount, tx_date = extract_receipt_fields(text)
-                st.subheader("🧾 Parsed Data")
-                st.markdown(f"**Vendor:** {vendor}")
-                st.markdown(f"**Amount:** ${amount:.2f}")
-                st.markdown(f"**Date:** {tx_date}")
-                if st.button("➕ Add to Transactions (Upload)"):
-                    add_transaction_to_state(vendor, amount, tx_date, "Receipt upload")
-                    st.success("✅ Transaction added!")
+        uploaded_files = st.file_uploader(
+            "Upload one or more receipt images",
+            type=["jpg", "jpeg", "png"],
+            accept_multiple_files=True
+        )
+
+        if uploaded_files:
+            st.info(f"📎 You uploaded {len(uploaded_files)} receipt(s).")
+            added_count = 0
+
+            for uploaded_file in uploaded_files:
+                st.image(uploaded_file, caption=f"🖼️ {uploaded_file.name}", width=300)
+
+                with st.spinner(f"🔍 Extracting text from {uploaded_file.name}..."):
+                    text = extract_text_from_image(uploaded_file)
+                    vendor, amount, tx_date = extract_receipt_fields(text)
+                    category = categorize_transaction(vendor, text)
+                    add_transaction_to_state(vendor, amount, tx_date, text)
+                    added_count += 1
+
+            st.success(f"✅ Added {added_count} new transaction(s) from uploaded receipts!")
+
+        # ✅ Show all receipt transactions
+        if "transactions" in st.session_state:
+            receipt_tx = [
+                {
+                    "Date": tx["date"],
+                    "Vendor": tx["merchant_name"],
+                    "Amount ($)": tx["amount"],
+                    "Category": ", ".join(tx.get("category", [])),
+                    "Source": tx.get("source", "")
+                }
+                for tx in st.session_state.transactions
+                if tx.get("source") == "manual_upload"
+            ]
+
+            if receipt_tx:
+                st.subheader("🧾 Uploaded Receipt Transactions")
+
+                # Render a header row
+                header_cols = st.columns([2, 3, 2, 2, 1])
+                header_cols[0].markdown("**Date**")
+                header_cols[1].markdown("**Vendor**")
+                header_cols[2].markdown("**Amount ($)**")
+                header_cols[3].markdown("**Category**")
+                header_cols[4].markdown("**Delete**")
+
+                for tx in receipt_tx:
+                    cols = st.columns([2, 3, 2, 2, 1])
+                    cols[0].markdown(tx["Date"])
+                    cols[1].markdown(tx["Vendor"])
+                    cols[2].markdown(f"${tx['Amount ($)']:.2f}")
+                    cols[3].markdown(tx["Category"])
+
+                    # Use transaction_id for accurate targeting
+                    matching = [
+                        t for t in st.session_state.transactions
+                        if t["date"] == tx["Date"] and t["merchant_name"] == tx["Vendor"]
+                    ]
+                    if matching:
+                        transaction_id = matching[0]["transaction_id"]
+                        if cols[4].button("❌", key=f"del_{transaction_id}"):
+                            from backend.utils.receipt_parser import delete_receipt_transaction
+                            delete_receipt_transaction(transaction_id)
+                            st.success("🗑️ Receipt deleted.")
+                            st.rerun()
+
+
+
+            else:
+                st.info("No receipt transactions found yet.")
 
     # ========== 📷 Webcam Capture Tab ==========
     with tab2:
@@ -85,6 +150,7 @@ def show_receipt_parser():
 
                 text = extract_text_from_image(buf)
                 vendor, amount, tx_date = extract_receipt_fields(text)
+                category = categorize_transaction(vendor, text)
 
                 st.subheader("🧾 Parsed Data")
                 st.markdown(f"**Vendor:** {vendor}")
@@ -99,5 +165,13 @@ def show_receipt_parser():
                         st.rerun()
                 with col2:
                     if st.button("➕ Add to Transactions (Webcam)"):
-                        add_transaction_to_state(vendor, amount, tx_date)
+                        add_transaction_to_state(vendor, amount, tx_date, text)
                         st.success("✅ Transaction added!")
+                        st.subheader("✅ Added Transaction")
+                        st.table([{
+                            "Date": str(tx_date),
+                            "Name": vendor,
+                            "Amount ($)": amount,
+                            "Category": category,
+                            "Source": "manual_upload"
+                        }])

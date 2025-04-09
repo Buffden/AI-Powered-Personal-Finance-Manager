@@ -245,9 +245,11 @@ def show_add_bank_account():
                             "Account": f"{tx.get('account_name', '')} ({tx.get('mask', '')})" if tx.get('account_name') else "",
                             "Source": tx.get("source", "unknown")
                         }
-                        for tx in plaid_transactions
+                        for tx in st.session_state.transactions
+                        if tx.get("account_id") in selected_accounts
                     ]
                     st.dataframe(table, use_container_width=True)
+                    
                     
                     # Show total transactions count
                     st.info(f"Total transactions in system: {len(st.session_state.all_transactions)}")

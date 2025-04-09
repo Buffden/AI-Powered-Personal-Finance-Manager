@@ -21,6 +21,48 @@ def normalize_name(name):
     return re.sub(r'[^a-z]', '', name.lower())
 
 # --- STEP 2: Detect Recurring Transactions ---
+
+# def detect_recurring_transactions(transactions):
+#     recurring = []
+
+#     grouped = defaultdict(list)
+#     for tx in transactions:
+#         try:
+#             norm_name = normalize_name(tx["name"])
+#             amount = round(float(tx["amount"]), 2)
+#             tx_date = datetime.strptime(tx["date"], "%Y-%m-%d").date()
+#             key = (norm_name, amount)
+#             grouped[key].append((tx_date, tx))
+#         except:
+#             continue
+
+#     for (norm_name, amount), entries in grouped.items():
+#         if len(entries) < 3:
+#             continue
+
+#         # Sort by date
+#         entries.sort(key=lambda x: x[0])
+#         dates = [entry[0] for entry in entries]
+
+#         # Calculate deltas between dates
+#         deltas = [abs((dates[i+1] - dates[i]).days) for i in range(len(dates)-1)]
+
+#         # Check if most intervals are around 15 days (±3 day tolerance)
+#         close_to_15 = [delta for delta in deltas if 10 <= delta <= 20]
+
+#         if len(close_to_15) >= len(deltas) - 1:  # allow 1 inconsistency
+#             last_date = dates[-1]
+#             next_due = last_date + timedelta(days=15)
+
+#             recurring.append({
+#                 "name": entries[-1][1]["name"],
+#                 "category": entries[-1][1].get("category", ["Other"])[0],
+#                 "amount": amount,
+#                 "next_due": next_due
+#             })
+
+#     return recurring
+
 def detect_recurring_transactions(transactions):
     recurring = []
 
