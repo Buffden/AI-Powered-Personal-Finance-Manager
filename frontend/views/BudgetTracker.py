@@ -5,7 +5,7 @@ import pandas as pd
 import altair as alt
 from dateutil import parser as date_parser
 import datetime
-import openai
+from openai import OpenAI
 from backend.utils.config import Config
 import json
 from components.AccountSelector import show_account_selector
@@ -13,10 +13,8 @@ from components.AccountSelector import show_account_selector
 def categorize_transactions(transactions):
     """Use OpenAI to categorize transactions and suggest budgets."""
     try:
-        # Get OpenAI API key
-        api_key = Config.get_openai_api_key()
-        openai.api_key = api_key
-
+        client = OpenAI()
+        
         # Calculate total spending per transaction name
         spending_summary = {}
         for tx in transactions:
@@ -100,7 +98,7 @@ def categorize_transactions(transactions):
         """
 
         # Get categorization from OpenAI
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a financial expert who understands practical budgeting. Always suggest realistic, rounded budget numbers that make sense for each category."},
@@ -154,12 +152,10 @@ def analyze_transactions_for_budgets(categorized_transactions):
         Category: Suggested Budget
         """
         
-        # Get OpenAI API key
-        api_key = Config.get_openai_api_key()
-        openai.api_key = api_key
+        client = OpenAI()
         
         # Get budget suggestions
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a financial advisor helping set reasonable monthly budgets."},

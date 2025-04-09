@@ -4,7 +4,7 @@ import re
 import os
 import pandas as pd
 import streamlit as st
-import openai
+from openai import OpenAI
 import base64
 import requests
 from io import BytesIO
@@ -12,9 +12,9 @@ from backend.utils.config import Config
 from frontend.components.AccountSelector import add_bank_to_state
 # Get OpenAI API key
 api_key = Config.get_openai_api_key()
-openai.api_key = api_key
 
 def extract_text_from_image(image) -> str:
+    client = OpenAI()
     img = Image.open(image).convert("RGB")
     buffered = BytesIO()
     img.save(buffered, format="PNG")
@@ -22,7 +22,7 @@ def extract_text_from_image(image) -> str:
     encoded_image = base64.b64encode(img_bytes).decode("utf-8")
 
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4-turbo",
             messages=[
                 {
@@ -37,7 +37,7 @@ def extract_text_from_image(image) -> str:
             ],
             max_tokens=2000
         )
-        return response.choices[0].message['content']
+        return response.choices[0].message.content
     except Exception as e:
         return f"Error with OpenAI Vision API: {str(e)}"
 
@@ -94,6 +94,7 @@ def extract_receipt_fields(text: str):
 
 def categorize_transaction(vendor: str, text: str):
     try:
+        client = OpenAI()
         prompt = f"""
         You are a smart finance assistant. Analyze the receipt details below and return the best category.
 
@@ -103,11 +104,11 @@ def categorize_transaction(vendor: str, text: str):
 
         Your response must be similar to these: Food and Drink, Groceries, Health, Shopping, Bills and Utilities, Transportation, Rent, Entertainment, Other.
         """
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
-        category = response.choices[0].message['content'].strip().capitalize()
+        category = response.choices[0].message.content.strip().capitalize()
         return category
     except:
         return "Uncategorized"

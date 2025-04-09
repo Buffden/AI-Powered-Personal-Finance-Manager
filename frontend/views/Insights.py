@@ -1,12 +1,10 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-import openai
+from openai import OpenAI
 import json
 from backend.utils.config import Config
 from components.AccountSelector import show_account_selector
-
-openai.api_key = Config.get_openai_api_key()
 
 def show_insights():
     st.title("📊 Spending Insights – AI Finance Manager")
@@ -66,7 +64,7 @@ def show_insights():
     st.subheader("🧠 Analyze My Spending Trends")
     if st.button("📊 Get AI Insights"):
         with st.spinner("Analyzing your charts..."):
-            openai.api_key = Config.get_openai_api_key()
+            client = OpenAI()
 
             # Group category totals
             category_data = (
@@ -104,7 +102,7 @@ Return natural-language bullet points. Be concise but insightful.
 """
 
             try:
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
                         {"role": "system", "content": "You are a helpful financial advisor analyzing spending trends."},

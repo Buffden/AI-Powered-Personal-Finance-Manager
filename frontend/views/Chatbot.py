@@ -2,6 +2,7 @@ import streamlit as st
 import io
 from backend.routes.ai_routes import chat_with_advisor
 from backend.utils.config import Config
+from openai import OpenAI
 
 def show_chatbot():
     st.title("💬 AI Financial Advisor")
@@ -25,6 +26,7 @@ def show_chatbot():
 
         try:
             api_key = Config.get_openai_api_key()
+            client = OpenAI(api_key=api_key)
 
             # Start chat on button press
             if not st.session_state.chat_started and st.button("🚀 Start Financial Advice Chat"):
