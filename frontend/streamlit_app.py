@@ -3,15 +3,7 @@ import streamlit as st
 import sys
 from pathlib import Path
 
-# Import all views
-from views.Home import show_home
-from views.AddBankAccount import show_add_bank_account
-from views.BudgetTracker import show_budget_tracker
-from views.Insights import show_insights
-from views.BillReminders import show_bill_reminders
-from views.Chatbot import show_chatbot
-from views.ReceiptParser import show_receipt_parser
-
+# Add project root to Python path first
 # Add both frontend and project root to Python path
 frontend_path = Path(__file__).parent
 project_root = frontend_path.parent
@@ -190,17 +182,25 @@ if status:
         st.session_state["current_page"] = "add_bank"
 
 # Page rendering based on session state
+# Lazy loading: only import the view when needed
 if st.session_state["current_page"] == "home":
+    from views.Home import show_home
     show_home()
 elif st.session_state["current_page"] == "add_bank":
+    from views.AddBankAccount import show_add_bank_account
     show_add_bank_account()
 elif st.session_state["current_page"] == "budget":
+    from views.BudgetTracker import show_budget_tracker
     show_budget_tracker()
 elif st.session_state["current_page"] == "insights":
+    from views.Insights import show_insights
     show_insights()
 elif st.session_state["current_page"] == "bills":
+    from views.BillReminders import show_bill_reminders
     show_bill_reminders()
 elif st.session_state["current_page"] == "chatbot":
+    from views.Chatbot import show_chatbot
     show_chatbot()
 elif st.session_state["current_page"] == "receiptparser":
+    from views.ReceiptParser import show_receipt_parser
     show_receipt_parser()
