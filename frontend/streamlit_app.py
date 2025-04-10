@@ -2,7 +2,15 @@
 import streamlit as st
 import sys
 from pathlib import Path
+
+# Import all views
+from views.Home import show_home
 from views.AddBankAccount import show_add_bank_account
+from views.BudgetTracker import show_budget_tracker
+from views.Insights import show_insights
+from views.BillReminders import show_bill_reminders
+from views.Chatbot import show_chatbot
+from views.ReceiptParser import show_receipt_parser
 
 # Add both frontend and project root to Python path
 frontend_path = Path(__file__).parent
@@ -143,7 +151,8 @@ pages = [
     ("📈", "Spending Insights", "insights"),
     ("📊", "Budget Tracking", "budget"),
     ("🔔", "Bill Reminders", "bills"),
-    ("💬", "AI Financial Advisor", "chatbot")
+    ("💬", "AI Financial Advisor", "chatbot"),
+    ("📸", "Receipt Parser", "receiptparser")
 ]
 
 st.sidebar.markdown('<div class="nav-wrapper">', unsafe_allow_html=True)
@@ -164,14 +173,6 @@ for icon, label, page in pages:
     """, unsafe_allow_html=True)
 st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
-# Import views
-from views.Home import show_home
-from views.BudgetTracker import show_budget_tracker
-from views.Insights import show_insights
-from views.BillReminders import show_bill_reminders
-from views.Chatbot import show_chatbot
-from views.AddBankAccount import show_add_bank_account
-
 # Handle Plaid callback status
 status = st.query_params.get("status")
 institution_name = st.query_params.get("institution_name")
@@ -181,19 +182,12 @@ if status:
     if status == "success":
         # Update current page to add_bank
         st.session_state["current_page"] = "add_bank"
-        # Keep the query parameters for AddBankAccount.py to handle
     elif status == "error" and error:
         st.error(f"❌ Error: {error}")
         st.session_state["current_page"] = "add_bank"
-        current_page = st.query_params.get("page", "add_bank")
-        st.query_params.clear()
-        st.query_params["page"] = current_page
     elif status == "cancelled":
         st.info("ℹ️ Bank linking was cancelled.")
         st.session_state["current_page"] = "add_bank"
-        current_page = st.query_params.get("page", "add_bank")
-        st.query_params.clear()
-        st.query_params["page"] = current_page
 
 # Page rendering based on session state
 if st.session_state["current_page"] == "home":
@@ -208,3 +202,5 @@ elif st.session_state["current_page"] == "bills":
     show_bill_reminders()
 elif st.session_state["current_page"] == "chatbot":
     show_chatbot()
+elif st.session_state["current_page"] == "receiptparser":
+    show_receipt_parser()
