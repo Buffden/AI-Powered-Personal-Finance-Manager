@@ -10,6 +10,8 @@ import requests
 from io import BytesIO
 from backend.utils.config import Config
 from frontend.components.AccountSelector import add_bank_to_state
+import uuid
+
 # Get OpenAI API key
 api_key = Config.get_openai_api_key()
 
@@ -75,19 +77,49 @@ def extract_receipt_fields(text: str):
     if filtered:
         amount = max(filtered)
 
-    date_match = re.search(r"\b(\d{2}[/-]\d{2}[/-]\d{4}|\d{4}[/-]\d{2}[/-]\d{2})\b", text)
-    try:
+    # Enhanced date parsing with multiple formats
+    date_patterns = [
+        # Common date formats
+        r"\b(\d{4}[-/]\d{2}[-/]\d{2})\b",  # YYYY-MM-DD or YYYY/MM/DD
+        r"\b(\d{2}[-/]\d{2}[-/]\d{4})\b",  # DD-MM-YYYY or DD/MM/YYYY
+        r"\b(\d{2}[-/]\d{2}[-/]\d{2})\b",  # DD-MM-YY or DD/MM/YY
+        # Month names
+        r"\b(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b",
+        r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b"
+    ]
+
+    parsed_date = None
+    for pattern in date_patterns:
+        date_match = re.search(pattern, text, re.IGNORECASE)
         if date_match:
+            date_str = date_match.group(0)
             try:
-                parsed_date = datetime.strptime(date_match.group(1), "%Y-%m-%d")
+                # Try different date formats
+                for fmt in [
+                    "%Y-%m-%d", "%Y/%m/%d",  # YYYY-MM-DD
+                    "%d-%m-%Y", "%d/%m/%Y",  # DD-MM-YYYY
+                    "%d-%m-%y", "%d/%m/%y",  # DD-MM-YY
+                    "%d %b %Y", "%d %B %Y",  # DD Mon YYYY
+                    "%b %d %Y", "%B %d %Y",  # Mon DD YYYY
+                    "%b %d, %Y", "%B %d, %Y"  # Mon DD, YYYY
+                ]:
+                    try:
+                        parsed_date = datetime.strptime(date_str, fmt)
+                        if parsed_date.year < 100:  # Fix 2-digit years
+                            parsed_date = parsed_date.replace(year=parsed_date.year + 2000)
+                        break
+                    except ValueError:
+                        continue
+                if parsed_date:
+                    break
             except:
-                parsed_date = datetime.strptime(date_match.group(1), "%d-%m-%Y")
-        else:
-            parsed_date = datetime.now()
-    except:
+                continue
+
+    # If no date found or parsing failed, use today's date
+    if not parsed_date:
         parsed_date = datetime.now()
 
-    # ✅ Format date to match Plaid-style HTTP/GMT format
+    # Format date consistently for the application
     formatted_date = parsed_date.strftime("%a, %d %b %Y %H:%M:%S GMT")
     return vendor, amount, formatted_date
 
@@ -123,90 +155,50 @@ def append_to_csv(new_txn, csv_path="transactions.csv"):
     df.to_csv(csv_path, index=False)
 
 
-def add_transaction_to_state(vendor, amount, tx_date, text):
-    # 🔍 Categorize based on text (simple logic or integrate your own)
-    category = categorize_transaction(vendor, text)
-
-    # ✅ Parse the date and convert to Plaid-style format
-    parsed_date = pd.to_datetime(tx_date)
-    formatted_date = parsed_date.strftime("%a, %d %b %Y %H:%M:%S GMT")
-
-    # ✅ Ensure session state keys exist
-    if "linked_banks" not in st.session_state:
-        st.session_state.linked_banks = {}
-    if "selected_accounts" not in st.session_state:
-        st.session_state.selected_accounts = {}
-    if "all_transactions" not in st.session_state:
-        st.session_state.all_transactions = []
-    if "transactions" not in st.session_state:
+def add_transaction_to_state(vendor, amount, date, text):
+    """Add a receipt transaction to the state."""
+    if 'transactions' not in st.session_state:
         st.session_state.transactions = []
-
-    # ✅ Define the manual upload bank account
-    manual_account = {
-        "account_id": "manual_upload",
-        "name": "Manual Upload",
-        "type": "other",
-        "subtype": "other",
-        "mask": "0000",
-        "official_name": "Manual Receipt Upload",
-        "balances": {
-            "available": None,
-            "current": None,
-            "limit": None,
-            "iso_currency_code": "USD"
-        }
-    }
-
-    # ✅ Register the bank if it doesn't exist
-    if (
-        "manual" not in st.session_state.linked_banks or
-        not any(acc["account_id"] == "manual_upload"
-                for acc in st.session_state.linked_banks.get("manual", {}).get("accounts", []))
-    ):
-        add_bank_to_state("Manual Upload", "manual", [manual_account])
-
-    # ✅ Force-select the account so it appears in filtered views
-    if "manual" not in st.session_state.selected_accounts:
-        st.session_state.selected_accounts["manual"] = {}
-    st.session_state.selected_accounts["manual"]["manual_upload"] = True
-
-    # ✅ Build transaction dict in Plaid-like format
-    new_txn = {
-        "transaction_id": f"receipt_{len(st.session_state.all_transactions)}",
-        "account_id": "manual_upload",
-        "account_name": "Manual Upload",
-        "institution_id": "manual",
-        "institution_name": "Manual Upload",
+    
+    # Create a unique transaction ID
+    transaction_id = str(uuid.uuid4())
+    
+    # Parse and standardize the date format
+    try:
+        # Convert GMT string to datetime object
+        if isinstance(date, str) and "GMT" in date:
+            parsed_date = datetime.strptime(date, "%a, %d %b %Y %H:%M:%S GMT")
+        else:
+            # Try parsing other date formats
+            parsed_date = pd.to_datetime(date)
+        
+        # Format date consistently as string
+        formatted_date = parsed_date.strftime("%Y-%m-%d %H:%M:%S")
+    except:
+        # Fallback to current datetime if parsing fails
+        formatted_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Format the transaction to match Plaid transaction format
+    transaction = {
+        "transaction_id": transaction_id,
         "date": formatted_date,
         "name": vendor,
-        "amount": amount,
-        "category": [category],
-        "category_id": "manual",
-        "pending": False,
-        "payment_channel": "other",
-        "transaction_type": "special",
         "merchant_name": vendor,
+        "amount": float(amount),
+        "category": [categorize_transaction(vendor, text)],  # Convert to list format
         "source": "manual_upload",
-        "authorized_date": formatted_date,
-        "authorized_datetime": parsed_date.isoformat(),
-        "datetime": parsed_date.isoformat(),
-        "payment_method": "other",
-        "payment_processor": None,
-        "personal_finance_category": {
-            "primary": category,
-            "detailed": category
-        }
+        "account_id": "receipt_upload",  # Special account ID for receipts
+        "account_name": "Receipt Upload"
     }
-
-    # ✅ Avoid duplicates
-    for tx in st.session_state.all_transactions or st.session_state.transactions:
-        if tx["name"] == vendor and abs(tx["amount"] - amount) < 0.01 and tx["date"] == formatted_date:
-            st.warning("⚠️ This transaction already exists.")
-            return
-
-    # ✅ Append to transactions
-    st.session_state.all_transactions.append(new_txn)
-    st.session_state.transactions = st.session_state.all_transactions.copy()
+    
+    # Add transaction and sort by date
+    st.session_state.transactions.append(transaction)
+    st.session_state.transactions.sort(key=lambda x: x["date"], reverse=True)  # Sort newest first
+    
+    # Also add to all_transactions if it exists and sort it
+    if 'all_transactions' in st.session_state:
+        st.session_state.all_transactions.append(transaction)
+        st.session_state.all_transactions.sort(key=lambda x: x["date"], reverse=True)  # Sort newest first
 
 def delete_receipt_transaction(transaction_id):
     # Remove from all_transactions

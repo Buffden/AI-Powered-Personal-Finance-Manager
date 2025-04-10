@@ -205,14 +205,39 @@ def show_budget_tracker():
         st.warning("No transactions found for selected accounts.")
         st.stop()
 
-    # Initialize or reuse BudgetTracker
-    if 'budget_tracker' not in st.session_state:
-        st.session_state['budget_tracker'] = BudgetTracker()
-    budget_tracker = st.session_state['budget_tracker']
-
-    # Initialize categorized transactions in session state if not exists
-    if 'categorized_transactions' not in st.session_state:
-        st.session_state['categorized_transactions'] = {}
+    # Create DataFrame
+    df = pd.DataFrame(transactions)
+    df["date"] = pd.to_datetime(df["date"])
+    
+    # Standardize category format and map to budget categories
+    def standardize_category(cat):
+        if isinstance(cat, list):
+            cat = cat[0] if cat else None
+        elif not isinstance(cat, str):
+            cat = None
+        
+        # Map categories to standard budget categories
+        category_mapping = {
+            "Food and Drink": "Food & Dining",
+            "Groceries": "Groceries",
+            "Health": "Healthcare",
+            "Shopping": "Shopping",
+            "Bills and Utilities": "Bills & Utilities",
+            "Transportation": "Transportation",
+            "Travel": "Travel",
+            "Rent": "Housing",
+            "Entertainment": "Entertainment",
+            "Transfer": "Transfer",
+            "Payment": "Payment",
+            "Other": "Miscellaneous"  # Renamed to be more descriptive
+        }
+        
+        # If category is None or not in mapping, try to extract meaningful category
+        if not cat or cat not in category_mapping:
+            return "Uncategorized"  # More descriptive than "Other"
+        return category_mapping[cat]
+    
+    df["category"] = df["category"].apply(standardize_category)
 
     # Extract available months from transactions
     all_months = sorted(set(
@@ -235,7 +260,16 @@ def show_budget_tracker():
         if date_parser.parse(tx['date']).strftime("%Y-%m") == selected_month
     ]
 
-    # Categorize transactions if not already done for this month
+    # Initialize or reuse BudgetTracker
+    if 'budget_tracker' not in st.session_state:
+        st.session_state['budget_tracker'] = BudgetTracker()
+    budget_tracker = st.session_state['budget_tracker']
+
+    # Initialize categorized transactions in session state if not exists
+    if 'categorized_transactions' not in st.session_state:
+        st.session_state['categorized_transactions'] = {}
+
+    # Categorize transactions if not already done for this month or if month changed
     if selected_month not in st.session_state['categorized_transactions'] or month_changed:
         with st.spinner("🤖 AI is categorizing your transactions..."):
             categorized = categorize_transactions(filtered_tx)
@@ -249,7 +283,7 @@ def show_budget_tracker():
                     st.session_state[f"{selected_month}_{category}"] = data['suggested_budget']
             
             st.success("✅ Transactions categorized and budget suggestions applied!")
-            
+
             # Automatically analyze spending when month changes
             budget_tracker.reset_month(selected_month)
             categorized_data = st.session_state['categorized_transactions'][selected_month]
@@ -270,9 +304,13 @@ def show_budget_tracker():
     if 'chart_summary' in st.session_state and 'chart_month' in st.session_state:
         summary = st.session_state['chart_summary']
         selected_month = st.session_state['chart_month']
-
+    
         # Convert summary to DataFrame for Altair
         df = pd.DataFrame(summary)
+        
+        # Filter out categories with no transactions and no budget
+        df = df[~((df['spent'] == 0) & (df['limit'] == 0))]
+        
         df['overspent'] = df['spent'] > df['limit']
         df['remaining'] = df['limit'] - df['spent']
         df['remaining'] = df['remaining'].clip(lower=0)
@@ -411,7 +449,7 @@ def show_budget_tracker():
                     st.success("✅ Budget suggestions updated!")
                 else:
                     st.warning("No suggestions available for this month's data.")
-
+    
     # Show budget input fields
     for category in categories:
         key = f"{selected_month}_{category}"
@@ -438,7 +476,7 @@ def show_budget_tracker():
         budget_tracker.set_monthly_limit(selected_month, category, limit)
 
     # Analyze Spending button
-    if st.button("📈 Analyze Spending") or month_changed:
+    if st.button("📈 Analyze Spending"):
         # Track expenses using AI-categorized transactions
         budget_tracker.reset_month(selected_month)
         categorized_data = st.session_state['categorized_transactions'][selected_month]
@@ -449,12 +487,7 @@ def show_budget_tracker():
                 budget_tracker.monthly_expenses[selected_month][category] = total_spent
 
         overspending = budget_tracker.get_overspending_summary(selected_month)
-        summary = budget_tracker.get_monthly_summary(selected_month)
-
-        # Store chart data in session_state
-        st.session_state['chart_summary'] = summary
-        st.session_state['chart_month'] = selected_month
-
+        
         # Add notifications
         if overspending:
             if 'notifications' not in st.session_state:
@@ -462,8 +495,7 @@ def show_budget_tracker():
             new_notes = generate_notifications(overspending, selected_month)
             st.session_state['notifications'].extend(new_notes)
 
-        if not month_changed:  # Only rerun if button was clicked, not if month changed
-            st.rerun()
+        st.rerun()
 
     # Check if we need to rerun due to account selection change
     if st.session_state.get('account_selection_changed', False):
