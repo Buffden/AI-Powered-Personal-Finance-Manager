@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Start virtual environment
+echo "Starting virtual environment..."
+source venv/bin/activate
+
 # Install requirements
 echo "Installing requirements..."
 pip install -r requirements.txt

@@ -19,9 +19,11 @@ def show_insights():
         st.warning("No transaction data found. Go to 'Home' and connect your bank first.")
         st.stop()
 
+    # Get all transactions including both bank and receipt transactions
     transactions = [
         tx for tx in st.session_state['transactions']
-        if tx.get('account_id') in selected_accounts
+        if (tx.get('account_id') in selected_accounts or  # Bank transactions
+            tx.get('source') == 'manual_upload')          # Receipt transactions
     ]
 
     if not transactions:
@@ -30,13 +32,37 @@ def show_insights():
 
     # Create DataFrame and ensure proper date handling
     df = pd.DataFrame(transactions)
-    df["date"] = pd.to_datetime(df["date"])
-    df = df.sort_values("date", ascending=False)  # Sort by date, newest first
+    
+    # Convert dates to datetime, handling different formats
+    def parse_date(date_str):
+        if isinstance(date_str, str):
+            try:
+                # Try parsing as ISO format first
+                return pd.to_datetime(date_str)
+            except:
+                try:
+                    # Try parsing as GMT format
+                    return pd.to_datetime(date_str, format="%a, %d %b %Y %H:%M:%S GMT")
+                except:
+                    # If both fail, return NaT
+                    return pd.NaT
+        return pd.NaT
+
+    df["date"] = df["date"].apply(parse_date)
+    
+    # Remove any rows with invalid dates
+    df = df.dropna(subset=["date"])
+    
+    # Sort by date, newest first
+    df = df.sort_values("date", ascending=False)
     
     # Standardize category format
     df["category"] = df["category"].apply(
         lambda x: ", ".join(x) if isinstance(x, list) else x if isinstance(x, str) else "Uncategorized"
     )
+
+    # Add source column for display
+    df["source"] = df["source"].fillna("bank")  # Mark missing sources as bank transactions
 
     # 1. Spending by Category
     st.subheader("🧾 Spending by Category")
@@ -73,8 +99,11 @@ def show_insights():
     st.subheader("📄 Transaction Table")
     
     # Format the display data
-    display_df = df[["date", "name", "amount", "category"]].copy()
+    display_df = df[["date", "name", "amount", "category", "source"]].copy()
+    # Format date to a more readable format
+    display_df["date"] = display_df["date"].dt.strftime("%Y-%m-%d %H:%M")
     display_df["amount"] = display_df["amount"].map("${:,.2f}".format)
+    display_df["source"] = display_df["source"].map({"manual_upload": "📷 Receipt", "bank": "🏦 Bank"})
     
     st.dataframe(
         display_df,
@@ -84,7 +113,8 @@ def show_insights():
             "date": "Date",
             "name": "Merchant",
             "amount": "Amount",
-            "category": "Category"
+            "category": "Category",
+            "source": "Source"
         }
     )
 
