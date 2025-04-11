@@ -35,9 +35,13 @@ def show_receipt_parser():
     if st.session_state["just_saved"]:
         st.success("✅ Transactions saved successfully!")
         if st.button("📸 Upload More Receipts", type="primary", use_container_width=True):
+            # Ensure all states are cleared when starting fresh
             st.session_state["just_saved"] = False
             st.session_state["uploaded_files"] = []
             st.session_state["processing_status"] = {}
+            st.session_state["pending_receipts"] = []
+            st.session_state["webcam_img"] = None
+            st.session_state["webcam_capture_requested"] = False
             st.rerun()
 
     # Show main interface if not just saved
@@ -258,8 +262,21 @@ def show_receipt_parser():
 
             # Store pending receipts in a temporary variable before clearing
             if st.button("💾 Save All Pending Transactions", type="primary", use_container_width=True):
-                pending_to_save = st.session_state["pending_receipts"].copy()
-                # Immediately clear all states to prevent duplicate submissions
+                temp_receipts = st.session_state["pending_receipts"].copy()
+                
+                # Process all transactions first
+                with st.spinner("Saving transactions..."):
+                    transaction_ids = []
+                    for receipt in temp_receipts:
+                        tx_id = add_transaction_to_state(
+                            receipt["vendor"],
+                            receipt["amount"],
+                            receipt["date"],
+                            receipt["text"]
+                        )
+                        transaction_ids.append(tx_id)
+                
+                # Only clear states after all transactions are processed
                 st.session_state["pending_receipts"] = []
                 st.session_state["uploaded_files"] = []
                 st.session_state["processing_status"] = {}
@@ -267,14 +284,7 @@ def show_receipt_parser():
                 st.session_state["webcam_capture_requested"] = False
                 st.session_state["just_saved"] = True
                 
-                with st.spinner("Saving transactions..."):
-                    for receipt in pending_to_save:
-                        add_transaction_to_state(
-                            receipt["vendor"],
-                            receipt["amount"],
-                            receipt["date"],
-                            receipt["text"]
-                        )
+                # Now trigger a single rerun after all processing is complete
                 st.rerun()
 
     # ========== 📊 Recent Receipt Transactions Section ==========
@@ -292,15 +302,9 @@ def show_receipt_parser():
                 cols[1].markdown(tx["merchant_name"])
                 cols[2].markdown(f"${tx['amount']:.2f}")
                 cols[3].markdown(", ".join(tx.get("category", [])))
-
-                # Use transaction_id for accurate targeting
-                matching = [
-                    t for t in st.session_state.transactions
-                    if t["date"] == tx["date"] and t["merchant_name"] == tx["merchant_name"]
-                ]
-                if matching:
-                    transaction_id = matching[0]["transaction_id"]
-                    if cols[4].button("❌", key=f"del_{transaction_id}"):
-                        delete_receipt_transaction(transaction_id)
-                        st.success("🗑️ Receipt deleted.")
-                        st.rerun()
+                
+                # Add delete button
+                if cols[4].button("❌", key=f"del_{tx['transaction_id']}"):
+                    delete_receipt_transaction(tx["transaction_id"])
+                    st.success("🗑️ Receipt deleted.")
+                    st.rerun()

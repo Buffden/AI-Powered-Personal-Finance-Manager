@@ -11,6 +11,7 @@ from io import BytesIO
 from backend.utils.config import Config
 from frontend.components.AccountSelector import add_bank_to_state
 import uuid
+from dateutil import parser
 
 # Get OpenAI API key
 api_key = Config.get_openai_api_key()
@@ -160,21 +161,46 @@ def add_transaction_to_state(vendor, amount, date, text):
     if 'transactions' not in st.session_state:
         st.session_state.transactions = []
     
+    # Initialize linked_banks if it doesn't exist
+    if 'linked_banks' not in st.session_state:
+        st.session_state.linked_banks = {
+            'manual_receipts': {
+                'account_id': 'manual_upload',
+                'account_name': 'Receipt Transactions',
+                'account_type': 'manual',
+                'balance': 0.0
+            }
+        }
+    
     # Create a unique transaction ID
     transaction_id = str(uuid.uuid4())
     
     # Parse and standardize the date format
     try:
-        # Convert GMT string to datetime object
-        if isinstance(date, str) and "GMT" in date:
-            parsed_date = datetime.strptime(date, "%a, %d %b %Y %H:%M:%S GMT")
+        # Handle different date formats
+        if isinstance(date, str):
+            if "GMT" in date:
+                # Try parsing GMT format
+                try:
+                    parsed_date = datetime.strptime(date, "%a, %d %b %Y %H:%M:%S GMT")
+                except ValueError:
+                    # Try alternate GMT format
+                    parsed_date = datetime.strptime(date, "%a, %d %b %Y %H:%M:%S")
+            else:
+                # Try other common formats
+                try:
+                    parsed_date = pd.to_datetime(date)
+                except:
+                    # Try parsing with dateutil as last resort
+                    parsed_date = parser.parse(date)
         else:
-            # Try parsing other date formats
-            parsed_date = pd.to_datetime(date)
+            # If date is already a datetime object
+            parsed_date = date if isinstance(date, datetime) else datetime.now()
         
         # Format date consistently as string
         formatted_date = parsed_date.strftime("%Y-%m-%d %H:%M:%S")
-    except:
+    except Exception as e:
+        print(f"Date parsing error: {e} for date: {date}")
         # Fallback to current datetime if parsing fails
         formatted_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -211,11 +237,11 @@ def add_transaction_to_state(vendor, amount, date, text):
         del st.session_state['insights_data']
     
     # Force refresh of account selector
-    if 'manual_receipts' in st.session_state.linked_banks:
+    if 'linked_banks' in st.session_state and 'manual_receipts' in st.session_state.linked_banks:
         del st.session_state.linked_banks['manual_receipts']
     
-    # Trigger rerun to refresh all components
-    st.rerun()
+    # Return the transaction ID for reference
+    return transaction_id
 
 def delete_receipt_transaction(transaction_id):
     # Remove from all_transactions
