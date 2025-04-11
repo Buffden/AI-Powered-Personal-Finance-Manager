@@ -518,8 +518,8 @@ def show_budget_tracker():
 
     # Show budget input fields
     for category in categories:
-        # Get the current budget limit from session state or default to 0
-        current_limit = st.session_state['budget_limits'][selected_month].get(category, 0.0)
+        # Get the current budget limit from session state or default to 0.0
+        current_limit = float(st.session_state['budget_limits'][selected_month].get(category, 0.0))
         
         # Show the input field with the current value
         new_limit = st.number_input(
@@ -527,14 +527,14 @@ def show_budget_tracker():
             min_value=0.0,
             step=10.0,
             value=current_limit,
-            key=f"{selected_month}_{category}",
+            key=f"budget_limit_{selected_month}_{category}",  # Changed key format to avoid conflicts
             help=f"Set your monthly budget limit for {category}"
         )
         
         # Update the budget limit if changed
         if new_limit != current_limit:
-            st.session_state['budget_limits'][selected_month][category] = new_limit
-            budget_tracker.set_monthly_limit(selected_month, category, new_limit)
+            st.session_state['budget_limits'][selected_month][category] = float(new_limit)
+            budget_tracker.set_monthly_limit(selected_month, category, float(new_limit))
 
     # Analyze Spending button
     if st.button("📈 Analyze Spending"):
