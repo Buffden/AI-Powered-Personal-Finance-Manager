@@ -84,14 +84,18 @@ def show_insights():
     st.subheader("📅 Spending Over Time")
     daily_spending = df.groupby("date")["amount"].sum().reset_index()
 
+    # Create the line chart with enhanced interactivity
     line_chart = alt.Chart(daily_spending).mark_line(point=True).encode(
         x=alt.X("date:T", title="Date"),
         y=alt.Y("amount:Q", title="Amount ($)"),
         tooltip=[
-            alt.Tooltip("date:T", title="Date"),
+            alt.Tooltip("date:T", title="Date", format="%Y-%m-%d"),
             alt.Tooltip("amount:Q", title="Amount", format="$.2f")
         ]
-    ).properties(width=700)
+    ).properties(
+        width=700,
+        height=400
+    ).interactive()  # Make the chart interactive
 
     st.altair_chart(line_chart, use_container_width=True)
 
@@ -139,7 +143,7 @@ def show_insights():
                 .reset_index()
                 .sort_values("date")
             )
-            date_df["date"] = date_df["date"].dt.strftime("%Y-%m-%d")  # 🔧 Convert to string
+            date_df["date"] = date_df["date"].dt.strftime("%Y-%m-%d")
             date_data = date_df.to_dict(orient="records")
 
             # Prompt to OpenAI

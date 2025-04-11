@@ -187,8 +187,8 @@ def add_transaction_to_state(vendor, amount, date, text):
         "amount": float(amount),
         "category": [categorize_transaction(vendor, text)],  # Convert to list format
         "source": "manual_upload",
-        "account_id": "receipt_upload",  # Special account ID for receipts
-        "account_name": "Receipt Upload"
+        "account_id": "manual_upload",  # Changed to match the account selector
+        "account_name": "Receipt Transactions"
     }
     
     # Add transaction and sort by date
@@ -198,7 +198,24 @@ def add_transaction_to_state(vendor, amount, date, text):
     # Also add to all_transactions if it exists and sort it
     if 'all_transactions' in st.session_state:
         st.session_state.all_transactions.append(transaction)
-        st.session_state.all_transactions.sort(key=lambda x: x["date"], reverse=True)  # Sort newest first
+        st.session_state.all_transactions.sort(key=lambda x: x["date"], reverse=True)
+    
+    # Reset any cached data in session state to force refresh of views
+    if 'chart_summary' in st.session_state:
+        del st.session_state['chart_summary']
+    if 'chart_month' in st.session_state:
+        del st.session_state['chart_month']
+    if 'categorized_transactions' in st.session_state:
+        del st.session_state['categorized_transactions']
+    if 'insights_data' in st.session_state:
+        del st.session_state['insights_data']
+    
+    # Force refresh of account selector
+    if 'manual_receipts' in st.session_state.linked_banks:
+        del st.session_state.linked_banks['manual_receipts']
+    
+    # Trigger rerun to refresh all components
+    st.rerun()
 
 def delete_receipt_transaction(transaction_id):
     # Remove from all_transactions
