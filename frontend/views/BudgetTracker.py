@@ -195,10 +195,11 @@ def show_budget_tracker():
         st.warning("⚠️ Please fetch transactions from the Home page first.")
         st.stop()
 
-    # Filter transactions for selected accounts
+    # Filter transactions for selected accounts, including receipt transactions
     transactions = [
         tx for tx in st.session_state['transactions']
-        if tx.get('account_id') in selected_accounts
+        if (tx.get('account_id') in selected_accounts or  # Bank transactions
+            tx.get('source') == 'manual_upload')          # Receipt transactions
     ]
 
     if not transactions:
@@ -207,7 +208,26 @@ def show_budget_tracker():
 
     # Create DataFrame
     df = pd.DataFrame(transactions)
-    df["date"] = pd.to_datetime(df["date"])
+    
+    # Convert dates to datetime, handling different formats
+    def parse_date(date_str):
+        if isinstance(date_str, str):
+            try:
+                # Try parsing as ISO format first
+                return pd.to_datetime(date_str)
+            except:
+                try:
+                    # Try parsing as GMT format
+                    return pd.to_datetime(date_str, format="%a, %d %b %Y %H:%M:%S GMT")
+                except:
+                    # If both fail, return NaT
+                    return pd.NaT
+        return pd.NaT
+
+    df["date"] = df["date"].apply(parse_date)
+    
+    # Remove any rows with invalid dates
+    df = df.dropna(subset=["date"])
     
     # Standardize category format and map to budget categories
     def standardize_category(cat):
@@ -241,7 +261,7 @@ def show_budget_tracker():
 
     # Extract available months from transactions
     all_months = sorted(set(
-        date_parser.parse(tx['date']).strftime("%Y-%m") for tx in transactions
+        date_parser.parse(str(date)).strftime("%Y-%m") for date in df["date"]
     ))
     
     # Add month selection with change detection
@@ -257,7 +277,7 @@ def show_budget_tracker():
     # Filter transactions for selected month
     filtered_tx = [
         tx for tx in transactions
-        if date_parser.parse(tx['date']).strftime("%Y-%m") == selected_month
+        if date_parser.parse(str(parse_date(tx['date']))).strftime("%Y-%m") == selected_month
     ]
 
     # Initialize or reuse BudgetTracker
@@ -547,6 +567,8 @@ def show_budget_tracker():
                 total_spent = sum(tx['amount'] for tx in data['transactions'])
                 budget_tracker.monthly_expenses[selected_month][category] = total_spent
 
+        # Get updated summary with current budget limits
+        summary = budget_tracker.get_monthly_summary(selected_month)
         overspending = budget_tracker.get_overspending_summary(selected_month)
         summary = budget_tracker.get_monthly_summary(selected_month)
 
@@ -554,7 +576,11 @@ def show_budget_tracker():
         st.session_state['chart_summary'] = summary
         st.session_state['chart_month'] = selected_month
         
-        # Add notifications
+        # Update chart data in session state
+        st.session_state['chart_summary'] = summary
+        st.session_state['chart_month'] = selected_month
+        
+        # Add notifications for overspending
         if overspending:
             if 'notifications' not in st.session_state:
                 st.session_state['notifications'] = []

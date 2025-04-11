@@ -11,6 +11,7 @@ from io import BytesIO
 from backend.utils.config import Config
 from frontend.components.AccountSelector import add_bank_to_state
 import uuid
+from dateutil import parser
 
 # Get OpenAI API key
 api_key = Config.get_openai_api_key()
@@ -160,21 +161,46 @@ def add_transaction_to_state(vendor, amount, date, text):
     if 'transactions' not in st.session_state:
         st.session_state.transactions = []
     
+    # Initialize linked_banks if it doesn't exist
+    if 'linked_banks' not in st.session_state:
+        st.session_state.linked_banks = {
+            'manual_receipts': {
+                'account_id': 'manual_upload',
+                'account_name': 'Receipt Transactions',
+                'account_type': 'manual',
+                'balance': 0.0
+            }
+        }
+    
     # Create a unique transaction ID
     transaction_id = str(uuid.uuid4())
     
     # Parse and standardize the date format
     try:
-        # Convert GMT string to datetime object
-        if isinstance(date, str) and "GMT" in date:
-            parsed_date = datetime.strptime(date, "%a, %d %b %Y %H:%M:%S GMT")
+        # Handle different date formats
+        if isinstance(date, str):
+            if "GMT" in date:
+                # Try parsing GMT format
+                try:
+                    parsed_date = datetime.strptime(date, "%a, %d %b %Y %H:%M:%S GMT")
+                except ValueError:
+                    # Try alternate GMT format
+                    parsed_date = datetime.strptime(date, "%a, %d %b %Y %H:%M:%S")
+            else:
+                # Try other common formats
+                try:
+                    parsed_date = pd.to_datetime(date)
+                except:
+                    # Try parsing with dateutil as last resort
+                    parsed_date = parser.parse(date)
         else:
-            # Try parsing other date formats
-            parsed_date = pd.to_datetime(date)
+            # If date is already a datetime object
+            parsed_date = date if isinstance(date, datetime) else datetime.now()
         
         # Format date consistently as string
         formatted_date = parsed_date.strftime("%Y-%m-%d %H:%M:%S")
-    except:
+    except Exception as e:
+        print(f"Date parsing error: {e} for date: {date}")
         # Fallback to current datetime if parsing fails
         formatted_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -187,8 +213,8 @@ def add_transaction_to_state(vendor, amount, date, text):
         "amount": float(amount),
         "category": [categorize_transaction(vendor, text)],  # Convert to list format
         "source": "manual_upload",
-        "account_id": "receipt_upload",  # Special account ID for receipts
-        "account_name": "Receipt Upload"
+        "account_id": "manual_upload",  # Changed to match the account selector
+        "account_name": "Receipt Transactions"
     }
     
     # Add transaction and sort by date
@@ -198,7 +224,24 @@ def add_transaction_to_state(vendor, amount, date, text):
     # Also add to all_transactions if it exists and sort it
     if 'all_transactions' in st.session_state:
         st.session_state.all_transactions.append(transaction)
-        st.session_state.all_transactions.sort(key=lambda x: x["date"], reverse=True)  # Sort newest first
+        st.session_state.all_transactions.sort(key=lambda x: x["date"], reverse=True)
+    
+    # Reset any cached data in session state to force refresh of views
+    if 'chart_summary' in st.session_state:
+        del st.session_state['chart_summary']
+    if 'chart_month' in st.session_state:
+        del st.session_state['chart_month']
+    if 'categorized_transactions' in st.session_state:
+        del st.session_state['categorized_transactions']
+    if 'insights_data' in st.session_state:
+        del st.session_state['insights_data']
+    
+    # Force refresh of account selector
+    if 'linked_banks' in st.session_state and 'manual_receipts' in st.session_state.linked_banks:
+        del st.session_state.linked_banks['manual_receipts']
+    
+    # Return the transaction ID for reference
+    return transaction_id
 
 def delete_receipt_transaction(transaction_id):
     # Remove from all_transactions
