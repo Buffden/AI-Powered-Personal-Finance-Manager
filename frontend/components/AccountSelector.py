@@ -7,6 +7,38 @@ def initialize_account_state():
         st.session_state.linked_banks = {}  # Store bank and account info
     if 'selected_accounts' not in st.session_state:
         st.session_state.selected_accounts = {}  # Store selection state
+    
+    # Add Receipt Transactions as a bank only if there are receipt transactions
+    has_receipts = any(
+        tx.get('source') == 'manual_upload' 
+        for tx in st.session_state.get('transactions', [])
+    )
+    
+    # Add or remove receipt transactions based on their existence
+    if has_receipts:
+        if 'manual_receipts' not in st.session_state.linked_banks:
+            receipt_account = {
+                'account_id': 'manual_upload',
+                'name': 'Receipt Transactions',
+                'type': 'receipts',
+                'mask': None
+            }
+            st.session_state.linked_banks['manual_receipts'] = {
+                'institution_name': '📷 Receipt Transactions',
+                'institution_id': 'manual_receipts',
+                'accounts': [receipt_account]
+            }
+            # Initialize selection state for receipt account
+            if 'manual_receipts' not in st.session_state.selected_accounts:
+                st.session_state.selected_accounts['manual_receipts'] = {
+                    'manual_upload': True  # Default to selected
+                }
+    else:
+        # Remove receipt transactions if no receipts exist
+        if 'manual_receipts' in st.session_state.linked_banks:
+            del st.session_state.linked_banks['manual_receipts']
+        if 'manual_receipts' in st.session_state.selected_accounts:
+            del st.session_state.selected_accounts['manual_receipts']
 
 def update_account_selection(bank_id, account_id, is_selected):
     """Update the selection state of an account"""
@@ -21,16 +53,18 @@ def show_account_selector(show_title=True):
     """
     initialize_account_state()
     
-    if not st.session_state.linked_banks:
-        if show_title:
-            st.warning("No banks linked. Please add a bank account first.")
-        return []
-
     if show_title:
         st.subheader("🏦 Select Accounts")
 
     selected_accounts = []
     
+    # Check if there are any real bank accounts (excluding receipt transactions)
+    real_banks = {k: v for k, v in st.session_state.linked_banks.items() if k != 'manual_receipts'}
+    if not real_banks:
+        if show_title:
+            st.warning("No banks linked. Please add a bank account first.")
+        return []
+
     # Create expander for each bank
     for bank_id, bank_info in st.session_state.linked_banks.items():
         with st.expander(f"🏛️ {bank_info['institution_name']}", expanded=True):
@@ -52,7 +86,9 @@ def show_account_selector(show_title=True):
                 # Individual account checkboxes
                 for acc in bank_info['accounts']:
                     # Create account label based on available fields
-                    if 'mask' in acc:
+                    if acc['type'] == 'receipts':
+                        account_label = acc['name']
+                    elif 'mask' in acc and acc['mask']:
                         account_label = f"{acc['name']} ({acc['type']}) - {acc['mask']}"
                     else:
                         account_label = f"{acc['name']} ({acc['type']})"

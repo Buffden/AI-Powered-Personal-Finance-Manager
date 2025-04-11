@@ -71,30 +71,41 @@ def show_add_bank_account():
     # Process tokens if they exist
     if status == "success" and tokens_str:
         try:
-            tokens = json.loads(tokens_str)
+            # First try direct JSON parsing
+            try:
+                tokens = json.loads(tokens_str)
+            except json.JSONDecodeError:
+                # If direct parsing fails, try URL decoding first
+                import urllib.parse
+                decoded_tokens = urllib.parse.unquote(tokens_str)
+                tokens = json.loads(decoded_tokens)
+            
             st.success(f"✅ Successfully linked {len(tokens)} banks!")
             
             # Process all collected tokens
             for token_info in tokens:
                 st.info(f"🔄 Processing {token_info['institution_name']}...")
-                response = requests.post(
-                    "http://localhost:5050/api/plaid/exchange_public_token",
-                    json=token_info
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    accounts = data.get("accounts", [])
-                    
-                    # Register the bank and its accounts in session state
-                    add_bank_to_state(
-                        token_info['institution_name'],
-                        token_info['institution_id'],
-                        accounts
+                try:
+                    response = requests.post(
+                        "http://localhost:5050/api/plaid/exchange_public_token",
+                        json=token_info
                     )
-                    st.success(f"✅ Successfully processed {token_info['institution_name']}")
-                else:
-                    st.error(f"❌ Failed to process {token_info['institution_name']}")
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        accounts = data.get("accounts", [])
+                        
+                        # Register the bank and its accounts in session state
+                        add_bank_to_state(
+                            token_info['institution_name'],
+                            token_info['institution_id'],
+                            accounts
+                        )
+                        st.success(f"✅ Successfully processed {token_info['institution_name']}")
+                    else:
+                        st.error(f"❌ Failed to process {token_info['institution_name']}: {response.text}")
+                except requests.exceptions.RequestException as e:
+                    st.error(f"❌ Connection error while processing {token_info['institution_name']}: {str(e)}")
             
             # Clear query parameters and refresh
             st.query_params.clear()
@@ -102,7 +113,10 @@ def show_add_bank_account():
             st.rerun()
         
         except Exception as e:
-            st.error(f"Error processing tokens: {str(e)}")
+            st.error(f"❌ Error processing tokens: {str(e)}")
+            st.error("Token string received:")
+            st.code(tokens_str)
+            st.error("Please try adding the bank again.")
     elif status == "error":
         error = st.query_params.get("error")
         st.error(f"❌ Error: {error}")
@@ -191,9 +205,11 @@ def show_add_bank_account():
                             "Account": f"{tx.get('account_name', '')} ({tx.get('mask', '')})" if tx.get('account_name') else "",
                             "Source": tx.get("source", "unknown")
                         }
-                        for tx in plaid_transactions
+                        for tx in st.session_state.transactions
+                        if tx.get("account_id") in selected_accounts
                     ]
                     st.dataframe(table, use_container_width=True)
+                    
                     
                     # Show total transactions count
                     st.info(f"Total transactions in system: {len(st.session_state.all_transactions)}")
