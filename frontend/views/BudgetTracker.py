@@ -400,116 +400,116 @@ def show_budget_tracker():
             st.error("Data is missing 'spent' or 'limit' values. Cannot compute overspending.")
             st.stop()
 
-                # Prepare data for side-by-side bars
-                chart_data = []
-                for _, row in df.iterrows():
-                    # Add budget bar data
-                    chart_data.append({
-                        'category': row['category'],
-                        'type': 'Budget',
-                        'amount': row['limit'],
-                        'spent': row['spent'],
-                        'remaining': row['remaining'],
-                        'percentage': row['percentage_spent'],
-                        'overspent': row['overspent'],
-                        'color_type': 'Budget'  # Add color type for budget bars
-                    })
-                    # Add spent bar data
-                    chart_data.append({
-                        'category': row['category'],
-                        'type': 'Spent',
-                        'amount': row['spent'],
-                        'spent': row['spent'],
-                        'remaining': row['remaining'],
-                        'percentage': row['percentage_spent'],
-                        'overspent': row['overspent'],
-                        'color_type': 'Overspent' if row['overspent'] else 'Spent'  # Add color type for spent bars
-                    })
+            # Prepare data for side-by-side bars
+            chart_data = []
+            for _, row in df.iterrows():
+                # Add budget bar data
+                chart_data.append({
+                    'category': row['category'],
+                    'type': 'Budget',
+                    'amount': row['limit'],
+                    'spent': row['spent'],
+                    'remaining': row['remaining'],
+                    'percentage': row['percentage_spent'],
+                    'overspent': row['overspent'],
+                    'color_type': 'Budget'  # Add color type for budget bars
+                })
+                # Add spent bar data
+                chart_data.append({
+                    'category': row['category'],
+                    'type': 'Spent',
+                    'amount': row['spent'],
+                    'spent': row['spent'],
+                    'remaining': row['remaining'],
+                    'percentage': row['percentage_spent'],
+                    'overspent': row['overspent'],
+                    'color_type': 'Overspent' if row['overspent'] else 'Spent'  # Add color type for spent bars
+                })
 
-                # Convert to DataFrame
-                chart_df = pd.DataFrame(chart_data)
+            # Convert to DataFrame
+            chart_df = pd.DataFrame(chart_data)
 
-                # Create a selection for highlighting
-                highlight = alt.selection_single(
-                    on='mouseover',
-                    fields=['category'],
-                    nearest=True
-                )
+            # Create a selection for highlighting
+            highlight = alt.selection_single(
+                on='mouseover',
+                fields=['category'],
+                nearest=True
+            )
 
-                # Create the chart
-                chart = alt.Chart(chart_df).mark_bar().encode(
-                    x=alt.X('category:N', 
+            # Create the chart
+            chart = alt.Chart(chart_df).mark_bar().encode(
+                x=alt.X('category:N', 
+                    title=None,
+                    sort=alt.SortField(field='amount', order='descending'),
+                    axis=alt.Axis(
+                        labelAngle=-45,
+                        labelAlign='right',
+                        labelPadding=4
+                    )
+                ),
+                y=alt.Y('amount:Q', 
+                    title='Amount ($)',
+                    axis=alt.Axis(grid=True)
+                ),
+                xOffset=alt.XOffset(
+                    "type:N",
+                    title=None
+                ),
+                color=alt.Color(
+                    'color_type:N',
+                    scale=alt.Scale(
+                        domain=['Budget', 'Spent', 'Overspent'],
+                        range=['#94A3B8', '#3B82F6', '#EF4444']
+                    ),
+                    legend=alt.Legend(
+                        orient='top',
                         title=None,
-                        sort=alt.SortField(field='amount', order='descending'),
-                        axis=alt.Axis(
-                            labelAngle=-45,
-                            labelAlign='right',
-                            labelPadding=4
-                        )
-                    ),
-                    y=alt.Y('amount:Q', 
-                        title='Amount ($)',
-                        axis=alt.Axis(grid=True)
-                    ),
-                    xOffset=alt.XOffset(
-                        "type:N",
-                        title=None
-                    ),
-                    color=alt.Color(
-                        'color_type:N',
-                        scale=alt.Scale(
-                            domain=['Budget', 'Spent', 'Overspent'],
-                            range=['#94A3B8', '#3B82F6', '#EF4444']
-                        ),
-                        legend=alt.Legend(
-                            orient='top',
-                            title=None,
-                            labelFontSize=12
-                        )
-                    ),
-                    opacity=alt.condition(highlight, alt.value(1), alt.value(0.9)),
-                    tooltip=[
-                        alt.Tooltip('category:N', title='Category'),
-                        alt.Tooltip('type:N', title='Type'),
-                        alt.Tooltip('amount:Q', title='Amount', format='$,.2f'),
-                        alt.Tooltip('remaining:Q', title='Remaining', format='$,.2f'),
-                        alt.Tooltip('percentage:Q', title='% of Budget Used', format='.1f')
-                    ]
-                ).properties(
-                    width=700,
-                    height=400
-                ).add_selection(
-                    highlight
-                ).configure_view(
-                    strokeWidth=0
-                ).configure_axis(
-                    labelFontSize=12,
-                    titleFontSize=14,
-                    gridColor='#f0f0f0',
-                    domainColor='#ddd'
-                )
+                        labelFontSize=12
+                    )
+                ),
+                opacity=alt.condition(highlight, alt.value(1), alt.value(0.9)),
+                tooltip=[
+                    alt.Tooltip('category:N', title='Category'),
+                    alt.Tooltip('type:N', title='Type'),
+                    alt.Tooltip('amount:Q', title='Amount', format='$,.2f'),
+                    alt.Tooltip('remaining:Q', title='Remaining', format='$,.2f'),
+                    alt.Tooltip('percentage:Q', title='% of Budget Used', format='.1f')
+                ]
+            ).properties(
+                width=700,
+                height=400
+            ).add_selection(
+                highlight
+            ).configure_view(
+                strokeWidth=0
+            ).configure_axis(
+                labelFontSize=12,
+                titleFontSize=14,
+                gridColor='#f0f0f0',
+                domainColor='#ddd'
+            )
 
-                # Add chart title and description
-                st.subheader("Budget vs. Spending")
-                st.caption("Compare your budgeted amounts with actual spending")
-                
-                # Display the chart
-                st.altair_chart(chart, use_container_width=True)
+            # Add chart title and description
+            st.subheader("Budget vs. Spending")
+            st.caption("Compare your budgeted amounts with actual spending")
+            
+            # Display the chart
+            st.altair_chart(chart, use_container_width=True)
 
-                # Detailed Summary Table
-                st.subheader("📋 Detailed Summary")
-                summary_df = pd.DataFrame(summary)
-                # Filter out zero spending from summary table
-                summary_df = summary_df[summary_df['spent'] > 0]
-                summary_df['Status'] = summary_df.apply(
-                    lambda row: '⚠️ Overspent' if row['spent'] > row['limit'] else '✅ Within Budget',
-                    axis=1
-                )
-                summary_df['Remaining'] = (summary_df['limit'] - summary_df['spent']).clip(lower=0)
-                st.dataframe(
-                    summary_df[['category', 'spent', 'limit', 'Remaining', 'Status']],
-                    use_container_width=True
-                )
+            # Detailed Summary Table
+            st.subheader("📋 Detailed Summary")
+            summary_df = pd.DataFrame(summary)
+            # Filter out zero spending from summary table
+            summary_df = summary_df[summary_df['spent'] > 0]
+            summary_df['Status'] = summary_df.apply(
+                lambda row: '⚠️ Overspent' if row['spent'] > row['limit'] else '✅ Within Budget',
+                axis=1
+            )
+            summary_df['Remaining'] = (summary_df['limit'] - summary_df['spent']).clip(lower=0)
+            st.dataframe(
+                summary_df[['category', 'spent', 'limit', 'Remaining', 'Status']],
+                use_container_width=True
+            )
 
     # Budget Settings Section
     st.subheader("💰 Budget Settings")
