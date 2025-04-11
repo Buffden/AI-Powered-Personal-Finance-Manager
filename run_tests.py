@@ -11,6 +11,7 @@ if __name__ == "__main__":
     suite.addTests(loader.loadTestsFromName("tests.frontend.views.test_budget_tracker"))
     suite.addTests(loader.loadTestsFromName("tests.frontend.views.test_add_bank_account"))
     suite.addTests(loader.loadTestsFromName("tests.frontend.views.test_chatbot"))
+    suite.addTests(loader.loadTestsFromName("tests.backend.utils.test_receipt_parser"))
 
     runner = unittest.TextTestRunner(verbosity=2)
     runner.run(suite)

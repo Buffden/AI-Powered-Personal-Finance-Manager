@@ -123,7 +123,7 @@ OPENAI_API_KEY=your-api-key
 #### On Windows
 Run the batch script:
 ```cmd
-startup_script.bat
+.\startup_script.ps1
 ```
 
 #### On Linux/Mac
