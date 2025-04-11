@@ -519,9 +519,15 @@ def show_budget_tracker():
                 total_spent = sum(tx['amount'] for tx in data['transactions'])
                 budget_tracker.monthly_expenses[selected_month][category] = total_spent
 
+        # Get updated summary with current budget limits
+        summary = budget_tracker.get_monthly_summary(selected_month)
         overspending = budget_tracker.get_overspending_summary(selected_month)
         
-        # Add notifications
+        # Update chart data in session state
+        st.session_state['chart_summary'] = summary
+        st.session_state['chart_month'] = selected_month
+        
+        # Add notifications for overspending
         if overspending:
             if 'notifications' not in st.session_state:
                 st.session_state['notifications'] = []
