@@ -1,4 +1,8 @@
 import unittest
+import warnings
+
+# Suppress "missing ScriptRunContext" warnings
+warnings.filterwarnings("ignore", message=".*missing ScriptRunContext.*")
 
 if __name__ == "__main__":
     loader = unittest.TestLoader()
@@ -12,6 +16,7 @@ if __name__ == "__main__":
     suite.addTests(loader.loadTestsFromName("tests.frontend.views.test_add_bank_account"))
     suite.addTests(loader.loadTestsFromName("tests.frontend.views.test_chatbot"))
     suite.addTests(loader.loadTestsFromName("tests.backend.utils.test_receipt_parser"))
+    suite.addTests(loader.loadTestsFromName("tests.frontend.views.test_receipt_parser"))
 
     runner = unittest.TextTestRunner(verbosity=2)
     runner.run(suite)

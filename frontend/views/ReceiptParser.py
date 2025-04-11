@@ -144,7 +144,7 @@ def show_receipt_parser():
                                                 "vendor": info["vendor"],
                                                 "amount": info["amount"],
                                                 "date": info["date"],
-                                                "category": info["category"],
+                                                "category": info.get("category", "Uncategorized"),  # Ensure category is always present
                                                 "text": info["text"]
                                             })
                                             st.rerun()
@@ -234,7 +234,7 @@ def show_receipt_parser():
                                     "vendor": vendor,
                                     "amount": amount,
                                     "date": tx_date,
-                                    "category": category,
+                                    "category": category if category else "Uncategorized",  # Default to "Uncategorized"
                                     "text": text
                                 })
                                 st.success("✅ Added to pending transactions!")
@@ -254,27 +254,26 @@ def show_receipt_parser():
                     "Vendor": receipt["vendor"],
                     "Amount ($)": receipt["amount"],
                     "Date": receipt["date"],
-                    "Category": receipt["category"]
+                    "Category": receipt.get("category", "Uncategorized")  # Fallback to "Uncategorized"
                 })
 
             df = pd.DataFrame(pending_data)
             st.dataframe(df, use_container_width=True)
 
             # Store pending receipts in a temporary variable before clearing
-            if st.button("💾 Save All Pending Transactions", type="primary", use_container_width=True):
+            if st.button("💾 Save All Pending Transactions"):
                 temp_receipts = st.session_state["pending_receipts"].copy()
                 
                 # Process all transactions first
                 with st.spinner("Saving transactions..."):
                     transaction_ids = []
                     for receipt in temp_receipts:
-                        tx_id = add_transaction_to_state(
+                        add_transaction_to_state(
                             receipt["vendor"],
                             receipt["amount"],
                             receipt["date"],
                             receipt["text"]
                         )
-                        transaction_ids.append(tx_id)
                 
                 # Only clear states after all transactions are processed
                 st.session_state["pending_receipts"] = []
@@ -298,9 +297,14 @@ def show_receipt_parser():
             # Show transactions in a table with delete option
             for tx in receipt_tx:
                 cols = st.columns([2, 3, 2, 2, 1])
+                if len(cols) < 3:  # Ensure sufficient columns
+                    raise IndexError("Insufficient columns to display transaction details.")
                 cols[0].markdown(tx["date"])
                 cols[1].markdown(tx["merchant_name"])
-                cols[2].markdown(f"${tx['amount']:.2f}")
+                if len(cols) > 2:  # Ensure cols[2] exists
+                    cols[2].markdown(f"${tx['amount']:.2f}")
+                else:
+                    st.error("Insufficient columns to display transaction amount.")
                 cols[3].markdown(", ".join(tx.get("category", [])))
                 
                 # Add delete button
@@ -308,3 +312,14 @@ def show_receipt_parser():
                     delete_receipt_transaction(tx["transaction_id"])
                     st.success("🗑️ Receipt deleted.")
                     st.rerun()
+
+def add_transaction_to_state(vendor, amount, date, receipt_text):
+    # Ensure the function updates the state correctly
+    if "transactions" not in st.session_state:
+        st.session_state["transactions"] = []
+    st.session_state["transactions"].append({
+        "vendor": vendor,
+        "amount": amount,
+        "date": date,
+        "receipt_text": receipt_text,
+    })
