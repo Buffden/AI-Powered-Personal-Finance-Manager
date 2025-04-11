@@ -269,189 +269,242 @@ def show_budget_tracker():
     if 'categorized_transactions' not in st.session_state:
         st.session_state['categorized_transactions'] = {}
 
-    # Categorize transactions if not already done for this month or if month changed
-    if selected_month not in st.session_state['categorized_transactions'] or month_changed:
+    # Initialize AI categorization status if not exists
+    if 'ai_categorized_months' not in st.session_state:
+        st.session_state['ai_categorized_months'] = set()
+
+    # Initialize budget categories in session state if not exists
+    if 'budget_categories' not in st.session_state:
+        st.session_state['budget_categories'] = {}
+
+    # Initialize budget limits in session state if not exists
+    if 'budget_limits' not in st.session_state:
+        st.session_state['budget_limits'] = {}
+
+    # Initialize budget limits for the selected month if not exists
+    if selected_month not in st.session_state['budget_limits']:
+        st.session_state['budget_limits'][selected_month] = {}
+
+    # Categorize transactions only if:
+    # 1. It's the first time viewing this month
+    # 2. User explicitly requests AI suggestions
+    if selected_month not in st.session_state['categorized_transactions']:
         with st.spinner("🤖 AI is categorizing your transactions..."):
             categorized = categorize_transactions(filtered_tx)
             st.session_state['categorized_transactions'][selected_month] = categorized
+            st.session_state['ai_categorized_months'].add(selected_month)
+            
+            # Store categories for this month
+            st.session_state['budget_categories'][selected_month] = [
+                category for category, data in categorized.items()
+                if isinstance(data, dict) and 
+                'transactions' in data and 
+                sum(tx['amount'] for tx in data['transactions']) > 0
+            ]
             
             # Set initial budget limits from AI suggestions
             for category, data in categorized.items():
                 if isinstance(data, dict) and 'suggested_budget' in data:
-                    budget_tracker.set_monthly_limit(selected_month, category, data['suggested_budget'])
-                    # Store in session state for the input fields
-                    st.session_state[f"{selected_month}_{category}"] = data['suggested_budget']
+                    budget_limit = data['suggested_budget']
+                    budget_tracker.set_monthly_limit(selected_month, category, budget_limit)
+                    st.session_state['budget_limits'][selected_month][category] = budget_limit
             
             st.success("✅ Transactions categorized and budget suggestions applied!")
 
-            # Automatically analyze spending when month changes
-            budget_tracker.reset_month(selected_month)
+    # Get categories for the selected month
+    categories = st.session_state['budget_categories'].get(selected_month, [])
+
+    # Update charts when month changes or when we have new data
+    if (month_changed or 
+        'chart_month' not in st.session_state or 
+        st.session_state['chart_month'] != selected_month):
+        
+        # Reset and update budget tracker for the new month
+        budget_tracker.reset_month(selected_month)
+        
+        # Restore budget limits from session state
+        if selected_month in st.session_state['budget_limits']:
+            for category, limit in st.session_state['budget_limits'][selected_month].items():
+                budget_tracker.set_monthly_limit(selected_month, category, limit)
+        
+        if selected_month in st.session_state['categorized_transactions']:
             categorized_data = st.session_state['categorized_transactions'][selected_month]
             
-            for category, data in categorized_data.items():
-                if isinstance(data, dict) and 'transactions' in data:
-                    total_spent = sum(tx['amount'] for tx in data['transactions'])
-                    budget_tracker.monthly_expenses[selected_month][category] = total_spent
+            # Update expenses for the new month
+            for category in categories:
+                if category in categorized_data and isinstance(categorized_data[category], dict):
+                    data = categorized_data[category]
+                    if 'transactions' in data:
+                        total_spent = sum(tx['amount'] for tx in data['transactions'])
+                        budget_tracker.monthly_expenses[selected_month][category] = total_spent
 
+            # Get new summary and update session state
             overspending = budget_tracker.get_overspending_summary(selected_month)
             summary = budget_tracker.get_monthly_summary(selected_month)
-
+            
             # Store chart data in session_state
             st.session_state['chart_summary'] = summary
             st.session_state['chart_month'] = selected_month
+            
+            # Add notifications if there's overspending
+            if overspending:
+                if 'notifications' not in st.session_state:
+                    st.session_state['notifications'] = []
+                new_notes = generate_notifications(overspending, selected_month)
+                st.session_state['notifications'].extend(new_notes)
 
     # Show charts if data exists
     if 'chart_summary' in st.session_state and 'chart_month' in st.session_state:
         summary = st.session_state['chart_summary']
-        selected_month = st.session_state['chart_month']
-    
-        # Convert summary to DataFrame for Altair
-        df = pd.DataFrame(summary)
+        chart_month = st.session_state['chart_month']
         
-        # Filter out entries with zero spending
-        df = df[df['spent'] > 0]
-        
-        if not df.empty:
-            df['overspent'] = df['spent'] > df['limit']
-            df['remaining'] = df['limit'] - df['spent']
-            df['remaining'] = df['remaining'].clip(lower=0)
-            df['percentage_spent'] = (df['spent'] / df['limit'] * 100).round(1)
-
-            # Prepare data for side-by-side bars
-            chart_data = []
-            for _, row in df.iterrows():
-                # Add budget bar data
-                chart_data.append({
-                    'category': row['category'],
-                    'type': 'Budget',
-                    'amount': row['limit'],
-                    'spent': row['spent'],
-                    'remaining': row['remaining'],
-                    'percentage': row['percentage_spent'],
-                    'overspent': row['overspent'],
-                    'color_type': 'Budget'  # Add color type for budget bars
-                })
-                # Add spent bar data
-                chart_data.append({
-                    'category': row['category'],
-                    'type': 'Spent',
-                    'amount': row['spent'],
-                    'spent': row['spent'],
-                    'remaining': row['remaining'],
-                    'percentage': row['percentage_spent'],
-                    'overspent': row['overspent'],
-                    'color_type': 'Overspent' if row['overspent'] else 'Spent'  # Add color type for spent bars
-                })
-
-            # Convert to DataFrame
-            chart_df = pd.DataFrame(chart_data)
-
-            # Create a selection for highlighting
-            highlight = alt.selection_single(
-                on='mouseover',
-                fields=['category'],
-                nearest=True
-            )
-
-            # Create the chart
-            chart = alt.Chart(chart_df).mark_bar().encode(
-                x=alt.X('category:N', 
-                    title=None,
-                    sort=alt.SortField(field='amount', order='descending'),
-                    axis=alt.Axis(
-                        labelAngle=-45,
-                        labelAlign='right',
-                        labelPadding=4
-                    )
-                ),
-                y=alt.Y('amount:Q', 
-                    title='Amount ($)',
-                    axis=alt.Axis(grid=True)
-                ),
-                xOffset=alt.XOffset(
-                    "type:N",
-                    title=None
-                ),
-                color=alt.Color(
-                    'color_type:N',
-                    scale=alt.Scale(
-                        domain=['Budget', 'Spent', 'Overspent'],
-                        range=['#94A3B8', '#3B82F6', '#EF4444']
-                    ),
-                    legend=alt.Legend(
-                        orient='top',
-                        title=None,
-                        labelFontSize=12
-                    )
-                ),
-                opacity=alt.condition(highlight, alt.value(1), alt.value(0.9)),
-                tooltip=[
-                    alt.Tooltip('category:N', title='Category'),
-                    alt.Tooltip('type:N', title='Type'),
-                    alt.Tooltip('amount:Q', title='Amount', format='$,.2f'),
-                    alt.Tooltip('remaining:Q', title='Remaining', format='$,.2f'),
-                    alt.Tooltip('percentage:Q', title='% of Budget Used', format='.1f')
-                ]
-            ).properties(
-                width=700,
-                height=400
-            ).add_selection(
-                highlight
-            ).configure_view(
-                strokeWidth=0
-            ).configure_axis(
-                labelFontSize=12,
-                titleFontSize=14,
-                gridColor='#f0f0f0',
-                domainColor='#ddd'
-            )
-
-            # Add chart title and description
-            st.subheader("Budget vs. Spending")
-            st.caption("Compare your budgeted amounts with actual spending")
+        # Only show charts if the data matches the selected month
+        if chart_month == selected_month:
+            # Convert summary to DataFrame for Altair
+            df = pd.DataFrame(summary)
             
-            # Display the chart
-            st.altair_chart(chart, use_container_width=True)
+            # Filter out entries with zero spending
+            df = df[df['spent'] > 0]
+            
+            if not df.empty:
+                df['overspent'] = df['spent'] > df['limit']
+                df['remaining'] = df['limit'] - df['spent']
+                df['remaining'] = df['remaining'].clip(lower=0)
+                df['percentage_spent'] = (df['spent'] / df['limit'] * 100).round(1)
 
-            # Detailed Summary Table
-            st.subheader("📋 Detailed Summary")
-            summary_df = pd.DataFrame(summary)
-            # Filter out zero spending from summary table
-            summary_df = summary_df[summary_df['spent'] > 0]
-            summary_df['Status'] = summary_df.apply(
-                lambda row: '⚠️ Overspent' if row['spent'] > row['limit'] else '✅ Within Budget',
-                axis=1
-            )
-            summary_df['Remaining'] = (summary_df['limit'] - summary_df['spent']).clip(lower=0)
-            st.dataframe(
-                summary_df[['category', 'spent', 'limit', 'Remaining', 'Status']],
-                use_container_width=True
-            )
+                # Prepare data for side-by-side bars
+                chart_data = []
+                for _, row in df.iterrows():
+                    # Add budget bar data
+                    chart_data.append({
+                        'category': row['category'],
+                        'type': 'Budget',
+                        'amount': row['limit'],
+                        'spent': row['spent'],
+                        'remaining': row['remaining'],
+                        'percentage': row['percentage_spent'],
+                        'overspent': row['overspent'],
+                        'color_type': 'Budget'  # Add color type for budget bars
+                    })
+                    # Add spent bar data
+                    chart_data.append({
+                        'category': row['category'],
+                        'type': 'Spent',
+                        'amount': row['spent'],
+                        'spent': row['spent'],
+                        'remaining': row['remaining'],
+                        'percentage': row['percentage_spent'],
+                        'overspent': row['overspent'],
+                        'color_type': 'Overspent' if row['overspent'] else 'Spent'  # Add color type for spent bars
+                    })
+
+                # Convert to DataFrame
+                chart_df = pd.DataFrame(chart_data)
+
+                # Create a selection for highlighting
+                highlight = alt.selection_single(
+                    on='mouseover',
+                    fields=['category'],
+                    nearest=True
+                )
+
+                # Create the chart
+                chart = alt.Chart(chart_df).mark_bar().encode(
+                    x=alt.X('category:N', 
+                        title=None,
+                        sort=alt.SortField(field='amount', order='descending'),
+                        axis=alt.Axis(
+                            labelAngle=-45,
+                            labelAlign='right',
+                            labelPadding=4
+                        )
+                    ),
+                    y=alt.Y('amount:Q', 
+                        title='Amount ($)',
+                        axis=alt.Axis(grid=True)
+                    ),
+                    xOffset=alt.XOffset(
+                        "type:N",
+                        title=None
+                    ),
+                    color=alt.Color(
+                        'color_type:N',
+                        scale=alt.Scale(
+                            domain=['Budget', 'Spent', 'Overspent'],
+                            range=['#94A3B8', '#3B82F6', '#EF4444']
+                        ),
+                        legend=alt.Legend(
+                            orient='top',
+                            title=None,
+                            labelFontSize=12
+                        )
+                    ),
+                    opacity=alt.condition(highlight, alt.value(1), alt.value(0.9)),
+                    tooltip=[
+                        alt.Tooltip('category:N', title='Category'),
+                        alt.Tooltip('type:N', title='Type'),
+                        alt.Tooltip('amount:Q', title='Amount', format='$,.2f'),
+                        alt.Tooltip('remaining:Q', title='Remaining', format='$,.2f'),
+                        alt.Tooltip('percentage:Q', title='% of Budget Used', format='.1f')
+                    ]
+                ).properties(
+                    width=700,
+                    height=400
+                ).add_selection(
+                    highlight
+                ).configure_view(
+                    strokeWidth=0
+                ).configure_axis(
+                    labelFontSize=12,
+                    titleFontSize=14,
+                    gridColor='#f0f0f0',
+                    domainColor='#ddd'
+                )
+
+                # Add chart title and description
+                st.subheader("Budget vs. Spending")
+                st.caption("Compare your budgeted amounts with actual spending")
+                
+                # Display the chart
+                st.altair_chart(chart, use_container_width=True)
+
+                # Detailed Summary Table
+                st.subheader("📋 Detailed Summary")
+                summary_df = pd.DataFrame(summary)
+                # Filter out zero spending from summary table
+                summary_df = summary_df[summary_df['spent'] > 0]
+                summary_df['Status'] = summary_df.apply(
+                    lambda row: '⚠️ Overspent' if row['spent'] > row['limit'] else '✅ Within Budget',
+                    axis=1
+                )
+                summary_df['Remaining'] = (summary_df['limit'] - summary_df['spent']).clip(lower=0)
+                st.dataframe(
+                    summary_df[['category', 'spent', 'limit', 'Remaining', 'Status']],
+                    use_container_width=True
+                )
 
     # Budget Settings Section
     st.subheader("💰 Budget Settings")
     
-    # Get categories from AI categorization with spending
-    if selected_month in st.session_state['categorized_transactions']:
-        categorized_data = st.session_state['categorized_transactions'][selected_month]
-        # Only include categories that have transactions with spending
-        categories = [
-            category for category, data in categorized_data.items()
-            if isinstance(data, dict) and 
-            'transactions' in data and 
-            sum(tx['amount'] for tx in data['transactions']) > 0
-        ]
-    else:
-        categories = []
-    
-    # Add AI Budget Suggestions
+    # Add AI Budget Suggestions button
     col1, col2 = st.columns([3, 1])
     with col2:
         if st.button("🤖 Get AI Budget Suggestions"):
             with st.spinner("Analyzing spending patterns..."):
                 categorized = categorize_transactions(filtered_tx)
                 if categorized:
-                    # Only update categories with spending
+                    st.session_state['categorized_transactions'][selected_month] = categorized
+                    st.session_state['ai_categorized_months'].add(selected_month)
+                    
+                    # Update categories for this month
+                    st.session_state['budget_categories'][selected_month] = [
+                        category for category, data in categorized.items()
+                        if isinstance(data, dict) and 
+                        'transactions' in data and 
+                        sum(tx['amount'] for tx in data['transactions']) > 0
+                    ]
+                    
+                    # Update budget suggestions
                     for category, data in categorized.items():
                         if ('transactions' in data and 
                             sum(tx['amount'] for tx in data['transactions']) > 0 and
@@ -462,31 +515,26 @@ def show_budget_tracker():
                     st.success("✅ Budget suggestions updated!")
                 else:
                     st.warning("No suggestions available for this month's data.")
-    
+
     # Show budget input fields
     for category in categories:
-        key = f"{selected_month}_{category}"
-        if key not in st.session_state:
-            # Get suggested budget from categorized data
-            if selected_month in st.session_state['categorized_transactions']:
-                category_data = st.session_state['categorized_transactions'][selected_month].get(category)
-                if isinstance(category_data, dict):
-                    suggested_budget = category_data.get('suggested_budget', 0.0)
-                else:
-                    suggested_budget = 0.0
-            else:
-                suggested_budget = 0.0
-            st.session_state[key] = suggested_budget
+        # Get the current budget limit from session state or default to 0.0
+        current_limit = float(st.session_state['budget_limits'][selected_month].get(category, 0.0))
         
-        # Show the input field with the current/suggested value
-        limit = st.number_input(
+        # Show the input field with the current value
+        new_limit = st.number_input(
             f"{category} Limit ($)",
             min_value=0.0,
             step=10.0,
-            key=key,
+            value=current_limit,
+            key=f"budget_limit_{selected_month}_{category}",  # Changed key format to avoid conflicts
             help=f"Set your monthly budget limit for {category}"
         )
-        budget_tracker.set_monthly_limit(selected_month, category, limit)
+        
+        # Update the budget limit if changed
+        if new_limit != current_limit:
+            st.session_state['budget_limits'][selected_month][category] = float(new_limit)
+            budget_tracker.set_monthly_limit(selected_month, category, float(new_limit))
 
     # Analyze Spending button
     if st.button("📈 Analyze Spending"):
@@ -500,6 +548,11 @@ def show_budget_tracker():
                 budget_tracker.monthly_expenses[selected_month][category] = total_spent
 
         overspending = budget_tracker.get_overspending_summary(selected_month)
+        summary = budget_tracker.get_monthly_summary(selected_month)
+
+        # Store chart data in session_state
+        st.session_state['chart_summary'] = summary
+        st.session_state['chart_month'] = selected_month
         
         # Add notifications
         if overspending:
@@ -508,6 +561,7 @@ def show_budget_tracker():
             new_notes = generate_notifications(overspending, selected_month)
             st.session_state['notifications'].extend(new_notes)
 
+        # Force a rerun to update the display
         st.rerun()
 
     # Check if we need to rerun due to account selection change
