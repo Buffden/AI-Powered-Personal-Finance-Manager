@@ -195,7 +195,7 @@ if status:
 # Page rendering based on session state
 # Lazy loading: only import the view when needed
 if st.session_state["current_page"] == "home":
-    from views.Home import show_home
+    from frontend.views.Home import show_home
     show_home()
 elif st.session_state["current_page"] == "add_bank":
     from views.AddBankAccount import show_add_bank_account

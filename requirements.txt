@@ -9,3 +9,4 @@ numpy>=1.24.0
 coverage
 flask
 mock
+streamlit_webrtc
