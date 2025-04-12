@@ -57,9 +57,11 @@ def show_insights():
     df = df.sort_values("date", ascending=False)
     
     # Standardize category format
+    # Use only the first category
     df["category"] = df["category"].apply(
-        lambda x: ", ".join(x) if isinstance(x, list) else x if isinstance(x, str) else "Uncategorized"
+        lambda x: x[0] if isinstance(x, list) and x else x if isinstance(x, str) else "Uncategorized"
     )
+
 
     # Add source column for display
     df["source"] = df["source"].fillna("bank")  # Mark missing sources as bank transactions

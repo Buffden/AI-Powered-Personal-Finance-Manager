@@ -1,8 +1,9 @@
-from datetime import datetime, timedelta, date
 from collections import defaultdict
+from datetime import datetime, timedelta, date
 from calendar import monthrange
+from dateutil import parser as date_parser
 import re
-import streamlit as st
+
 
 # --- STEP 1: Budget Overspending Alerts ---
 def generate_notifications(overspending_summary, year_month):
@@ -16,62 +17,23 @@ def generate_notifications(overspending_summary, year_month):
         notifications.append(notification)
     return notifications
 
-# --- Normalize merchant name (strip special chars & lowercase) ---
 def normalize_name(name):
     return re.sub(r'[^a-z]', '', name.lower())
 
-# --- STEP 2: Detect Recurring Transactions ---
-
-# def detect_recurring_transactions(transactions):
-#     recurring = []
-
-#     grouped = defaultdict(list)
-#     for tx in transactions:
-#         try:
-#             norm_name = normalize_name(tx["name"])
-#             amount = round(float(tx["amount"]), 2)
-#             tx_date = datetime.strptime(tx["date"], "%Y-%m-%d").date()
-#             key = (norm_name, amount)
-#             grouped[key].append((tx_date, tx))
-#         except:
-#             continue
-
-#     for (norm_name, amount), entries in grouped.items():
-#         if len(entries) < 3:
-#             continue
-
-#         # Sort by date
-#         entries.sort(key=lambda x: x[0])
-#         dates = [entry[0] for entry in entries]
-
-#         # Calculate deltas between dates
-#         deltas = [abs((dates[i+1] - dates[i]).days) for i in range(len(dates)-1)]
-
-#         # Check if most intervals are around 15 days (±3 day tolerance)
-#         close_to_15 = [delta for delta in deltas if 10 <= delta <= 20]
-
-#         if len(close_to_15) >= len(deltas) - 1:  # allow 1 inconsistency
-#             last_date = dates[-1]
-#             next_due = last_date + timedelta(days=15)
-
-#             recurring.append({
-#                 "name": entries[-1][1]["name"],
-#                 "category": entries[-1][1].get("category", ["Other"])[0],
-#                 "amount": amount,
-#                 "next_due": next_due
-#             })
-
-#     return recurring
-
 def detect_recurring_transactions(transactions):
     recurring = []
-
     grouped = defaultdict(list)
+
     for tx in transactions:
         try:
             norm_name = normalize_name(tx["name"])
             amount = round(float(tx["amount"]), 2)
-            tx_date = datetime.strptime(tx["date"], "%Y-%m-%d").date()
+
+            # ❌ Skip negative or zero transactions (credits/refunds)
+            if amount <= 0:
+                continue
+
+            tx_date = date_parser.parse(tx["date"]).date()
             key = (norm_name, amount)
             grouped[key].append((tx_date, tx))
         except:
@@ -82,27 +44,24 @@ def detect_recurring_transactions(transactions):
             continue
 
         entries.sort(key=lambda x: x[0])
-        day_set = set(entry[0].day for entry in entries)
+        dates = [entry[0] for entry in entries]
+        months_seen = set((d.year, d.month) for d in dates)
 
-        if len(day_set) == 1:
-            recurring_day = entries[-1][0].day
-            today = date.today()
-            year = today.year
-            month = today.month
+        # Require recurrence in at least 3 different months
+        if len(months_seen) < 3:
+            continue
 
-            if today.day < recurring_day:
-                next_due_month = month
-                next_due_year = year
-            else:
-                next_due_month = month + 1
-                next_due_year = year
-                if next_due_month > 12:
-                    next_due_month = 1
-                    next_due_year += 1
+        avg_day = sum(d.day for d in dates) / len(dates)
 
-            max_day = monthrange(next_due_year, next_due_month)[1]
-            due_day = min(recurring_day, max_day)
-            next_due = date(next_due_year, next_due_month, due_day)
+        # Allow ±3 day tolerance around the average billing day
+        if all(abs(d.day - avg_day) <= 3 for d in dates):
+            last_date = dates[-1]
+            next_month = last_date.month + 1
+            next_year = last_date.year + (1 if next_month > 12 else 0)
+            next_month = 1 if next_month > 12 else next_month
+            max_day = monthrange(next_year, next_month)[1]
+            next_day = min(round(avg_day), max_day)
+            next_due = date(next_year, next_month, next_day)
 
             recurring.append({
                 "name": entries[-1][1]["name"],
@@ -122,24 +81,76 @@ def generate_bill_reminders(recurring_candidates, days_ahead=5):
     for item in recurring_candidates:
         due_date = item["next_due"]
 
-        while due_date <= end_date:
-            if due_date >= today:
-                reminders.append({
-                    "name": item["name"],
-                    "category": item["category"],
-                    "amount": item["amount"],
-                    "due_date": due_date.isoformat(),
-                    "message": f"📅 Recurring payment: **{item['name']}** (${item['amount']}) occurs monthly on day {due_date.day}. Next due: {due_date}."
-                })
+        # Only include if due within range
+        if today <= due_date <= end_date:
+            reminders.append({
+                "name": item["name"],
+                "category": item["category"],
+                "amount": item["amount"],
+                "due_date": due_date.isoformat(),
+                "message": f"📅 Recurring payment: **{item['name']}** (${item['amount']}) is due on {due_date}."
+            })
 
-            year, month = due_date.year, due_date.month + 1
-            if month > 12:
-                month = 1
-                year += 1
-
-            max_day = monthrange(year, month)[1]
-            next_day = min(item["next_due"].day, max_day)
-            due_date = date(year, month, next_day)
-
+    # Sort reminders by due date
     reminders.sort(key=lambda r: r["due_date"])
-    return reminders
+    return reminders   
+
+from openai import OpenAI
+from backend.utils.config import Config
+
+def filter_important_recurring(recurring_candidates):
+    client = OpenAI(api_key=Config.get_openai_api_key())
+
+    # Format the recurring transactions as plain text
+    formatted_list = "\n".join(
+        f"- {r['name']} | ${r['amount']} | Due: {r['next_due']}"
+        for r in recurring_candidates
+    )
+
+    prompt = f"""
+You are a financial assistant reviewing a user's recurring transactions.
+
+From the list below, identify and return ONLY the important recurring financial obligations, such as:
+- rent or mortgage payments
+- credit card or loan payments
+- insurance
+- utilities (electricity, water, gas, internet)
+- mobile phone bills
+- subscriptions (Netflix, Spotify, gym, etc.)
+
+Ignore food, dining, fast food, coffee shop.
+
+Just return the names of important recurring transactions, as a simple list.
+
+Here is the list to review:
+
+{formatted_list}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a smart financial assistant."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        # Extract names line-by-line from the AI response
+        content = response.choices[0].message.content
+        important_names = set()
+        for line in content.splitlines():
+            if line.startswith("- "):
+                name = line[2:].strip()
+                if name:
+                    important_names.add(name.lower())
+
+        # Match back against original recurring candidates
+        return [
+            tx for tx in recurring_candidates
+            if tx["name"].lower() in important_names
+        ]
+
+    except Exception as e:
+        print("⚠️ AI filtering failed:", e)
+        return recurring_candidates  # fallback if error
