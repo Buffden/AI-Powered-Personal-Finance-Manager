@@ -28,9 +28,13 @@ def show_bill_reminders():
 
         # 🚀 Detect recurring payments and reminders
         # recurring = detect_recurring_transactions(st.session_state['transactions'])
-        recurring_candidates = detect_recurring_transactions(st.session_state['transactions'])
-        recurring = filter_important_recurring(recurring_candidates)
-        reminders = generate_bill_reminders(recurring, days_ahead=days_ahead)
+        if 'recurring_static' not in st.session_state:
+            recurring_candidates = detect_recurring_transactions(st.session_state['transactions'])
+            filtered = filter_important_recurring(recurring_candidates)
+            st.session_state['recurring_static'] = filtered
+
+        reminders = generate_bill_reminders(st.session_state['recurring_static'], days_ahead=days_ahead)
+
 
 
         st.subheader(f"🔁 Recurring Payments (due within {days_ahead} days)")
