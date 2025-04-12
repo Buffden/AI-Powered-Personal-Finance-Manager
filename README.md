@@ -101,16 +101,7 @@ git clone https://github.com/your-username/AI-Powered-Personal-Finance-Manager.g
 cd AI-Powered-Personal-Finance-Manager
 ```
 
-### 2. Set Up Python Environment
-```bash
-python3 -m venv venv
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass # If you get a permission denied error on Windows
-.\venv\Scripts\Activate # Windows
-source venv/bin/activate # Linux/Mac
-pip install -r requirements.txt
-```
-
-### 3. Add API Keys to `.env`
+### 2. Add API Keys to `.env`
 Create a `.env` file in the project root and add the following:
 ```
 PLAID_CLIENT_ID=your-client-id
@@ -118,7 +109,7 @@ PLAID_SECRET=your-sandbox-secret
 OPENAI_API_KEY=your-api-key
 ```
 
-### 4. Run the Application
+### 3. Run the Application
 
 #### On Windows
 Run the batch script:
@@ -182,7 +173,7 @@ Open the `htmlcov/index.html` file in your browser to view a detailed coverage r
 ## 👥 Contributors
 - **Harshwardhan Patil** – Frontend, Dashboard, CI/CD, Plaid, OpenAI API.
 - **Sanjana** – Backend Integrations, Alert System.
-- **Matthew** – AI/ML & ChatGPT integration, Automation Testing.
+- **Matthew** – AI/ML & ChatGPT integration, Automation Testing, Debugging.
 
 ---
 
