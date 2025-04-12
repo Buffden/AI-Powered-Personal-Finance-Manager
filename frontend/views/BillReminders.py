@@ -2,7 +2,8 @@ import streamlit as st
 import requests
 from backend.utils.notifications import (
     detect_recurring_transactions,
-    generate_bill_reminders
+    generate_bill_reminders,
+    filter_important_recurring
 )
 from datetime import datetime
 
@@ -23,11 +24,14 @@ def show_bill_reminders():
         st.subheader("📅 Upcoming Bills")
 
         # 🔁 Days-ahead slider
-        days_ahead = st.slider("Show recurring bills due in the next X days:", min_value=1, max_value=90, value=5)
+        days_ahead = st.slider("Show recurring bills due in the next X days:", min_value=1, max_value=30, value=5)
 
         # 🚀 Detect recurring payments and reminders
-        recurring = detect_recurring_transactions(st.session_state['transactions'])
+        # recurring = detect_recurring_transactions(st.session_state['transactions'])
+        recurring_candidates = detect_recurring_transactions(st.session_state['transactions'])
+        recurring = filter_important_recurring(recurring_candidates)
         reminders = generate_bill_reminders(recurring, days_ahead=days_ahead)
+
 
         st.subheader(f"🔁 Recurring Payments (due within {days_ahead} days)")
         if reminders:
