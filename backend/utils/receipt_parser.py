@@ -134,7 +134,7 @@ def categorize_transaction(vendor: str, text: str):
         Vendor: {vendor}
         Receipt Contents:
         {text}
-
+        If you're adding more than a word, then make the first letter of each important word capitalized.
         Your response must be similar to these: Food and Drink, Groceries, Health, Shopping, Bills and Utilities, Transportation, Rent, Entertainment, Other.
         """
         response = client.chat.completions.create(
@@ -216,7 +216,16 @@ def add_transaction_to_state(vendor, amount, date, text):
         "account_id": "manual_upload",  # Changed to match the account selector
         "account_name": "Receipt Transactions"
     }
-    
+  # 🔁 Duplicate check (same vendor, amount, and date)
+    for existing in st.session_state.transactions:
+        if (
+            existing["name"].lower() == vendor.lower() and
+            abs(existing["amount"] - float(amount)) < 0.01 and
+            existing["date"].split()[0] == formatted_date.split()[0]
+        ):
+            st.session_state.duplicate_warning = True
+            return None
+
     # Add transaction and sort by date
     st.session_state.transactions.append(transaction)
     st.session_state.transactions.sort(key=lambda x: x["date"], reverse=True)  # Sort newest first
