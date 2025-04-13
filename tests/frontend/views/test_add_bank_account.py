@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
-from io import StringIO
+from io import StringIO, BytesIO
 import frontend.views.AddBankAccount as aba
 
 
@@ -52,6 +52,42 @@ class TestProcessUploadedStatement(unittest.TestCase):
             result = aba.process_uploaded_statement(file)
             self.assertEqual(result, 0)
             mock_st.error.assert_called_once()
+
+    @patch("frontend.views.AddBankAccount.st")
+    def test_empty_csv_file(self, mock_st):
+        mock_st.session_state = {}
+
+        empty_csv = StringIO("")
+        empty_csv.name = "empty.csv"
+        empty_csv.type = "text/csv"
+
+        result = aba.process_uploaded_statement(empty_csv)
+        self.assertEqual(result, 0)
+        mock_st.error.assert_called_once_with("Failed to read CSV: No columns to parse from file")
+
+    @patch("frontend.views.AddBankAccount.st")
+    def test_large_csv_file(self, mock_st):
+        mock_st.session_state = {}
+
+        large_csv = StringIO("\n".join(["vendor,amount ($),category"] + [f"Vendor{i},10.00,Category{i}" for i in range(1000)]))
+        large_csv.name = "large.csv"
+        large_csv.type = "text/csv"
+
+        result = aba.process_uploaded_statement(large_csv)
+        self.assertEqual(result, 1000)
+        self.assertEqual(len(mock_st.session_state["transactions"]), 1000)
+
+    @patch("frontend.views.AddBankAccount.st")
+    def test_invalid_csv_format(self, mock_st):
+        mock_st.session_state = {}
+
+        invalid_csv = BytesIO(b"Not a CSV content")
+        invalid_csv.name = "invalid.csv"
+        invalid_csv.type = "text/csv"
+
+        result = aba.process_uploaded_statement(invalid_csv)
+        self.assertEqual(result, 0)
+        mock_st.error.assert_called_once_with("Missing required columns.")
 
 class TestAddBankToState(unittest.TestCase):
     @patch("frontend.views.AddBankAccount.st")
@@ -108,6 +144,152 @@ class TestAddBankToState(unittest.TestCase):
             list(mock_st.session_state.selected_accounts["mock123"].keys()),
             ["acc1"]
         )
+
+    @patch("frontend.views.AddBankAccount.requests.post")
+    @patch("frontend.views.AddBankAccount.show_account_selector")
+    @patch("frontend.views.AddBankAccount.st")
+    def test_add_bank_to_state_new_bank(self, mock_st, mock_show_account_selector, mock_requests_post):
+        # Mock session_state with MagicMock to simulate attribute-style access
+        mock_st.session_state = MagicMock()
+        mock_st.session_state.linked_banks = {}
+        mock_st.session_state.selected_accounts = {"mock123": {"acc1": True}}  # Ensure at least one account is selected
+
+        # Mock show_account_selector to return selected accounts
+        mock_show_account_selector.return_value = ["acc1"]
+
+        # Mock tabs
+        mock_st.tabs.return_value = [MagicMock(), MagicMock(), MagicMock()]  # Mock three tabs
+
+        # Mock columns
+        mock_st.columns.return_value = [MagicMock(), MagicMock()]  # Mock two columns
+
+        # Define mock_uploaded_file
+        mock_uploaded_file = MagicMock()
+        mock_uploaded_file.name = "statement.csv"
+        mock_uploaded_file.type = "text/csv"
+        mock_uploaded_file.size = 1024  # Set a valid size in bytes
+
+        mock_st.file_uploader.return_value = mock_uploaded_file
+
+        # Mock subheader
+        mock_st.subheader = MagicMock()
+
+        # Mock the API response for requests.post
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "transactions": [
+                {"date": "2025-04-01", "name": "Transaction 1", "amount": 100, "category": ["Category 1"], "account_id": "acc1"},
+                {"date": "2025-04-02", "name": "Transaction 2", "amount": 200, "category": ["Category 2"], "account_id": "acc1"}
+            ]
+        }
+        mock_requests_post.return_value = mock_response
+
+        # Call the function
+        aba.show_add_bank_account()
+
+        # Assertions
+        mock_st.subheader.assert_any_call("Connected Accounts")
+        mock_st.subheader.assert_any_call("📥 Fetch Transactions")
+        mock_requests_post.assert_called()  # Ensure the API was called
+
+class TestShowAddBankAccount(unittest.TestCase):
+    @patch("frontend.views.AddBankAccount.requests.post")
+    @patch("frontend.views.AddBankAccount.show_account_selector")
+    @patch("frontend.views.AddBankAccount.st")
+    def test_show_add_bank_account_manage_banks(self, mock_st, mock_show_account_selector, mock_requests_post):
+        # Mock session_state with MagicMock
+        mock_st.session_state = MagicMock()
+        mock_st.session_state.linked_banks = {"test123": {"institution_name": "Test Bank", "accounts": []}}
+        mock_st.session_state.selected_accounts = {"test123": {"acc1": True}}  # Ensure at least one account is selected
+
+        # Mock show_account_selector to return selected accounts
+        mock_show_account_selector.return_value = ["acc1"]
+
+        # Mock tabs
+        mock_st.tabs.return_value = [MagicMock(), MagicMock(), MagicMock()]  # Mock three tabs
+
+        # Mock columns
+        mock_st.columns.return_value = [MagicMock(), MagicMock()]  # Mock two columns
+
+        # Mock file uploader
+        mock_uploaded_file = MagicMock()
+        mock_uploaded_file.size = 2048  # Set a valid size in bytes
+        mock_st.file_uploader.return_value = mock_uploaded_file
+
+        # Mock subheader
+        mock_st.subheader = MagicMock()
+
+        # Mock the API response for requests.post
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "transactions": [
+                {"date": "2025-04-01", "name": "Transaction 1", "amount": 100, "category": ["Category 1"], "account_id": "acc1"},
+                {"date": "2025-04-02", "name": "Transaction 2", "amount": 200, "category": ["Category 2"], "account_id": "acc1"}
+            ]
+        }
+        mock_requests_post.return_value = mock_response
+
+        # Call the function
+        aba.show_add_bank_account()
+
+        # Assertions
+        mock_st.subheader.assert_any_call("Connected Accounts")
+        mock_st.subheader.assert_any_call("📥 Fetch Transactions")
+        mock_requests_post.assert_called()  # Ensure the API was called
+
+    @patch("frontend.views.AddBankAccount.st")
+    def test_show_add_bank_account_upload_statement(self, mock_st):
+        # Mock session_state with MagicMock
+        mock_st.session_state = MagicMock()
+
+        # Mock tabs to return only the "Upload Bank Statement" tab
+        mock_tab = MagicMock()
+        mock_st.tabs.return_value = [MagicMock(), MagicMock(), mock_tab]
+
+        # Mock file uploader
+        mock_uploaded_file = MagicMock()
+        mock_uploaded_file.name = "statement.csv"
+        mock_uploaded_file.type = "text/csv"
+        mock_uploaded_file.size = 1024  # Set a valid size in bytes
+        mock_st.file_uploader.return_value = mock_uploaded_file
+
+        # Mock button click
+        mock_st.button.side_effect = lambda label, **kwargs: label == "Process Statement"
+
+        # Call the function
+        aba.show_add_bank_account()
+
+        # Assertions
+        mock_st.file_uploader.assert_called_once_with(
+            "Choose a bank statement file",
+            type=["csv"],
+            help="Currently supporting CSV files. PDF and DOC support coming soon!"
+        )
+        mock_st.button.assert_any_call("Process Statement", use_container_width=True)
+
+    @patch("frontend.views.AddBankAccount.st")
+    def test_show_add_bank_account_link_new_bank(self, mock_st):
+        # Mock session_state with MagicMock
+        mock_st.session_state = MagicMock()
+        mock_st.tabs.return_value = [MagicMock(), MagicMock(), MagicMock()]  # Mock tabs
+
+        # Mock file uploader
+        mock_uploaded_file = MagicMock()
+        mock_uploaded_file.name = "statement.csv"
+        mock_uploaded_file.type = "text/csv"
+        mock_uploaded_file.size = 2048  # Set a valid size in bytes (e.g., 2 KB)
+        mock_st.file_uploader.return_value = mock_uploaded_file
+
+        # Mock button click
+        mock_st.button.return_value = True
+
+        # Call the function
+        aba.show_add_bank_account()
+
+        # Assertions
+        mock_st.button.assert_any_call("Link New Bank Account", key="link_new_bank", use_container_width=True)
 
 if __name__ == "__main__":
     unittest.main()
