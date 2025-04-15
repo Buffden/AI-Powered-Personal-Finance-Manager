@@ -78,15 +78,17 @@ AI-Powered-Personal-Finance-Manager/
 │   │   └── routes/
 │   │       ├── test_bill_routes.py
 │   │       └── test_plaid_routes.py
-│   └── frontend/
-│       ├── test_streamlit_app.py
-│       └── views/
-│           ├── test_add_bank_account.py
-│           ├── test_budget_tracker.py
-│           └── test_chatbot.py
+│   ├── frontend/
+│   │   ├── test_streamlit_app.py
+│   │   ├── playwright/
+│   │   │   └── test_navigation.py
+│   │   └── views/
+│   │       ├── test_add_bank_account.py
+│   │       ├── test_budget_tracker.py
+│   │       └── test_chatbot.py
 ├── .env
 ├── requirements.txt
-├── run_test.py
+├── run_tests.py
 ├── startup_script.sh
 └── startup_script.bat
 ```
@@ -141,7 +143,7 @@ set PYTHONPATH=. # Windows
 export PYTHONPATH=. # Linux/Mac
 ```
 
-### 2. Run Tests with Coverage
+### 2. Run Unit Tests with Coverage
 To run the tests and measure code coverage:
 ```bash
 coverage run --source=backend,frontend run_tests.py
@@ -158,6 +160,28 @@ To generate an HTML coverage report:
 coverage html
 ```
 Open the `htmlcov/index.html` file in your browser to view a detailed coverage report.
+
+---
+
+## 🧪 Running GUI Tests
+
+### Prerequisites
+Ensure you have Playwright installed:
+```bash
+pip install playwright
+playwright install
+```
+
+### Running the GUI Tests
+To run the Playwright-based GUI tests:
+```bash
+pytest tests/frontend/playwright/test_navigation.py
+```
+
+These tests will:
+1. Launch a headless browser.
+2. Navigate through the Streamlit app.
+3. Verify navigation and UI elements on each page.
 
 ---
 
