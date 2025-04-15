@@ -90,7 +90,7 @@ AI-Powered-Personal-Finance-Manager/
 ├── requirements.txt
 ├── run_tests.py
 ├── startup_script.sh
-└── startup_script.bat
+└── startup_script.ps1
 ```
 
 ---
@@ -114,13 +114,13 @@ OPENAI_API_KEY=your-api-key
 ### 3. Run the Application
 
 #### On Windows
-Run the batch script:
-```cmd
+Use the PowerShell script:
+```powershell
 .\startup_script.ps1
 ```
 
 #### On Linux/Mac
-Run the Bash script:
+Use the Bash script:
 ```bash
 bash startup_script.sh
 ```
@@ -168,15 +168,19 @@ Open the `htmlcov/index.html` file in your browser to view a detailed coverage r
 ### Prerequisites
 Ensure you have Playwright installed:
 ```bash
-pip install playwright
 playwright install
 ```
 
 ### Running the GUI Tests
-To run the Playwright-based GUI tests:
-```bash
-pytest tests/frontend/playwright/test_navigation.py
-```
+1. Start the application using the startup script:
+   ```powershell
+   .\startup_script.ps1 # windows
+   bash startup_script.sh # linux/mac
+   ```
+2. In a separate terminal, run the Playwright-based GUI tests:
+   ```bash
+   pytest tests/frontend/playwright/test_navigation.py
+   ```
 
 These tests will:
 1. Launch a headless browser.

@@ -60,5 +60,18 @@ def test_navigation():
             print(page.content())
             raise e
 
+        # Test navigation to Budget Tracking and verify elements
+        try:
+            page.click("text=📊 Budget Tracking")
+            page.wait_for_selector("text=📊 Budget Tracker - Monthly Overspending", timeout=30000)
+            if page.is_visible("text=No banks linked"):
+                print("No banks linked. Skipping Budget Settings test.")
+            else:
+                assert page.is_visible("text=💰 Budget Settings"), "Budget Settings section is not visible"
+        except Exception as e:
+            print("Failed to load Budget Tracking or its elements. Debugging content:")
+            print(page.content())
+            raise e
+
         # Close browser
         browser.close()
