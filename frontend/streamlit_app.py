@@ -1,7 +1,11 @@
 # frontend/app.py
 import streamlit as st
 import sys
+import os
 from pathlib import Path
+from frontend.views.AddBankAccount import show_add_bank_account
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 # Add project root to Python path first
 # Add both frontend and project root to Python path
@@ -165,6 +169,13 @@ for icon, label, page in pages:
     """, unsafe_allow_html=True)
 st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
+# Import views
+from frontend.views.Home import show_home
+from frontend.views.BudgetTracker import show_budget_tracker
+from frontend.views.Insights import show_insights
+from frontend.views.BillReminders import show_bill_reminders
+from frontend.views.Chatbot import show_chatbot
+
 # Handle Plaid callback status
 status = st.query_params.get("status")
 institution_name = st.query_params.get("institution_name")
@@ -184,7 +195,7 @@ if status:
 # Page rendering based on session state
 # Lazy loading: only import the view when needed
 if st.session_state["current_page"] == "home":
-    from views.Home import show_home
+    from frontend.views.Home import show_home
     show_home()
 elif st.session_state["current_page"] == "add_bank":
     from views.AddBankAccount import show_add_bank_account

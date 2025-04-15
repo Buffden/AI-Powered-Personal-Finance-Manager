@@ -4,11 +4,10 @@ from backend.utils.notifications import generate_notifications
 import pandas as pd
 import altair as alt
 from dateutil import parser as date_parser
-import datetime
 from openai import OpenAI
 from backend.utils.config import Config
 import json
-from components.AccountSelector import show_account_selector
+from frontend.components.AccountSelector import show_account_selector
 
 def categorize_transactions(transactions):
     """Use OpenAI to categorize transactions and suggest budgets."""
@@ -208,6 +207,10 @@ def show_budget_tracker():
 
     # Create DataFrame
     df = pd.DataFrame(transactions)
+
+    # Ensure 'category' column exists
+    if 'category' not in df.columns:
+        df['category'] = "Uncategorized"
     
     # Convert dates to datetime, handling different formats
     def parse_date(date_str):

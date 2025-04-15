@@ -145,7 +145,7 @@ def show_receipt_parser():
                                                 "vendor": info["vendor"],
                                                 "amount": info["amount"],
                                                 "date": info["date"],
-                                                "category": info["category"],
+                                                "category": info.get("category", "Uncategorized"),  # Ensure category is always present
                                                 "text": info["text"]
                                             })
                                             st.rerun()
@@ -235,7 +235,7 @@ def show_receipt_parser():
                                     "vendor": vendor,
                                     "amount": amount,
                                     "date": tx_date,
-                                    "category": category,
+                                    "category": category if category else "Uncategorized",  # Default to "Uncategorized"
                                     "text": text
                                 })
                                 st.success("✅ Added to pending transactions!")
@@ -349,7 +349,10 @@ def show_receipt_parser():
                 parsed_date = pd.to_datetime(tx["date"], errors="coerce")
                 cols[0].markdown(parsed_date.strftime("%Y-%m-%d") if not pd.isnull(parsed_date) else tx["date"])
                 cols[1].markdown(tx["merchant_name"])
-                cols[2].markdown(f"${tx['amount']:.2f}")
+                if len(cols) > 2:  # Ensure cols[2] exists
+                    cols[2].markdown(f"${tx['amount']:.2f}")
+                else:
+                    st.error("Insufficient columns to display transaction amount.")
                 cols[3].markdown(", ".join(tx.get("category", [])))
                 
                 with cols[4]:

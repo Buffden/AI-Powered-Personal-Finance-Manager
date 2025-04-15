@@ -4,7 +4,7 @@ import altair as alt
 from openai import OpenAI
 import json
 from backend.utils.config import Config
-from components.AccountSelector import show_account_selector
+from frontend.components.AccountSelector import show_account_selector
 
 def show_insights():
     st.title("📊 Spending Insights – AI Finance Manager")

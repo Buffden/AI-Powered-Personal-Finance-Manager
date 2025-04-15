@@ -5,8 +5,6 @@ from backend.utils.notifications import (
     generate_bill_reminders,
     filter_important_recurring
 )
-from datetime import datetime
-
 
 def show_bill_reminders():
     st.title("🔔 Budget Alerts & Bill Reminders")
