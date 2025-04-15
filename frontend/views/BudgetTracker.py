@@ -373,8 +373,15 @@ def show_budget_tracker():
             if overspending:
                 if 'notifications' not in st.session_state:
                     st.session_state['notifications'] = []
+
                 new_notes = generate_notifications(overspending, selected_month)
-                st.session_state['notifications'].extend(new_notes)
+                
+                # ✅ De-duplicate based on message
+                existing_messages = {note["message"] for note in st.session_state['notifications']}
+                unique_new_notes = [note for note in new_notes if note["message"] not in existing_messages]
+                
+                st.session_state['notifications'].extend(unique_new_notes)
+
 
     # Show charts if data exists
     if 'chart_summary' in st.session_state and 'chart_month' in st.session_state:
@@ -587,10 +594,16 @@ def show_budget_tracker():
         
         # Add notifications for overspending
         if overspending:
-            if 'notifications' not in st.session_state:
-                st.session_state['notifications'] = []
-            new_notes = generate_notifications(overspending, selected_month)
-            st.session_state['notifications'].extend(new_notes)
+                if 'notifications' not in st.session_state:
+                    st.session_state['notifications'] = []
+
+                new_notes = generate_notifications(overspending, selected_month)
+                
+                # ✅ De-duplicate based on message
+                existing_messages = {note["message"] for note in st.session_state['notifications']}
+                unique_new_notes = [note for note in new_notes if note["message"] not in existing_messages]
+                
+                st.session_state['notifications'].extend(unique_new_notes)
 
         # Force a rerun to update the display
         st.rerun()

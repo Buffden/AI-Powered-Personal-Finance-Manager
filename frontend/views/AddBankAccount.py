@@ -181,7 +181,7 @@ def show_add_bank_account():
                             st.error(f"Failed to fetch transactions for account {account_id}")
 
                 if plaid_transactions:
-                    st.success(f"Found {len(plaid_transactions)} transactions.")
+                    st.success(f"Found {len(plaid_transactions)} bank transactions.")
                     
                     # Remove any existing Plaid transactions for these accounts
                     st.session_state.all_transactions = [
@@ -195,19 +195,45 @@ def show_add_bank_account():
                     # Update the main transactions list
                     st.session_state.transactions = st.session_state.all_transactions.copy()
                     
-                    # Display simplified transaction table
+                    # Build account_id → institution_name map
+                    # Build account_id → details map
+                    account_info_map = {}
+                    if "linked_banks" in st.session_state:
+                        for bank in st.session_state["linked_banks"].values():
+                            institution = bank.get("institution_name", "Unknown Bank")
+                            for account in bank.get("accounts", []):
+                                acc_id = account["account_id"]
+                                acc_type = account.get("subtype", account.get("type", "Account"))
+                                mask = account.get("mask", "XXXX")
+                                name = account.get("name", "")
+                                account_info_map[acc_id] = {
+                                    "institution": institution,
+                                    "type": acc_type.title(),
+                                    "mask": mask,
+                                    "name": name
+                                }
+
+                    # Build final table
                     table = [
                         {
-                            "Date": tx["date"],
+                            "Date": pd.to_datetime(tx["date"], errors="coerce").strftime("%Y-%m-%d") if tx.get("date") else "",
                             "Name": tx["name"],
                             "Amount ($)": tx["amount"],
-                            "Category": ", ".join(tx.get("category", [])),
-                            "Account": f"{tx.get('account_name', '')} ({tx.get('mask', '')})" if tx.get('account_name') else "",
-                            "Source": tx.get("source", "unknown")
+                            "Category": ", ".join(tx.get("category", [])) if isinstance(tx.get("category"), list) else tx.get("category", "Uncategorized"),
+                            "Account": (
+                                f"{account_info_map[tx['account_id']]['institution']} – {account_info_map[tx['account_id']]['type']} ({account_info_map[tx['account_id']]['mask']})"
+                                if tx.get("account_id") in account_info_map else "Manual Upload – Receipt Transactions"
+                            ),
+                            "Source": (
+                                "📷 Receipt"
+                                if tx.get("source") == "manual_upload"
+                                else f"🏦 {account_info_map.get(tx.get('account_id'), {}).get('institution', 'Bank')}"
+                            )
                         }
                         for tx in st.session_state.transactions
                         if tx.get("account_id") in selected_accounts
                     ]
+
                     st.dataframe(table, use_container_width=True)
                     
                     
