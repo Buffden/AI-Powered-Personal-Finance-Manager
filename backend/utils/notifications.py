@@ -7,15 +7,21 @@ import re
 
 # --- STEP 1: Budget Overspending Alerts ---
 def generate_notifications(overspending_summary, year_month):
+    seen_messages = set()
     notifications = []
+
     for category, exceeded_amount in overspending_summary.items():
-        notification = {
-            "month": year_month,
-            "category": category,
-            "message": f"⚠️ You exceeded your budget for {category} by ${exceeded_amount:.2f} in {year_month}."
-        }
-        notifications.append(notification)
+        message = f"⚠️ You exceeded your budget for {category} by ${exceeded_amount:.2f} in {year_month}."
+        if message not in seen_messages:
+            notifications.append({
+                "month": year_month,
+                "category": category,
+                "message": message
+            })
+            seen_messages.add(message)
+
     return notifications
+
 
 def normalize_name(name):
     return re.sub(r'[^a-z]', '', name.lower())

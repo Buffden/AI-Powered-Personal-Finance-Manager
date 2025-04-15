@@ -16,7 +16,7 @@ def show_chatbot():
 
     # Goals input (only at the start)
     if not st.session_state.chat_started:
-        user_goals = st.text_area("🎯 Enter your financial goals (optional):", placeholder="e.g., save for a home, car, or emergency...")
+        user_goals = ""  #st.text_area("🎯 Enter your financial goals (optional):", placeholder="e.g., save for a home, car, or emergency...")
 
     # Check if transactions are available
     if 'transactions' not in st.session_state:

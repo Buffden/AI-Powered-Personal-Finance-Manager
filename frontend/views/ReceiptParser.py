@@ -11,6 +11,7 @@ from backend.utils.receipt_parser import (
     categorize_transaction,
     delete_receipt_transaction
 )
+import backend.utils.receipt_parser as rp
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 
 def show_receipt_parser():
@@ -246,46 +247,92 @@ def show_receipt_parser():
         if st.session_state["pending_receipts"]:
             st.markdown("---")
             st.subheader("📋 Pending Transactions")
-            
-            # Show pending transactions in a table
-            pending_data = []
-            for idx, receipt in enumerate(st.session_state["pending_receipts"]):
-                pending_data.append({
-                    "Vendor": receipt["vendor"],
-                    "Amount ($)": receipt["amount"],
-                    "Date": receipt["date"],
-                    "Category": receipt["category"]
-                })
 
-            df = pd.DataFrame(pending_data)
-            st.dataframe(df, use_container_width=True)
+            # Build editable DataFrame from pending receipts
+            df_pending = pd.DataFrame([
+                {
+                    "Vendor": r["vendor"],
+                    "Amount ($)": r["amount"],
+                    "Date": r["date"],
+                    "Category": r["category"]
+                }
+                for r in st.session_state["pending_receipts"]
+            ])
 
-            # Store pending receipts in a temporary variable before clearing
+            # Show editable table
+            edited_df = st.data_editor(
+                df_pending,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="fixed",
+                column_config={
+                    "Vendor": st.column_config.TextColumn(),
+                    "Amount ($)": st.column_config.NumberColumn(format="$%.2f"),
+                    "Date": st.column_config.TextColumn(),
+                    "Category": st.column_config.TextColumn()
+                }
+            )
+
+            # Sync changes back to session state
+            for i in range(len(edited_df)):
+                st.session_state["pending_receipts"][i]["vendor"] = edited_df.at[i, "Vendor"]
+                st.session_state["pending_receipts"][i]["amount"] = edited_df.at[i, "Amount ($)"]
+                st.session_state["pending_receipts"][i]["date"] = edited_df.at[i, "Date"]
+                st.session_state["pending_receipts"][i]["category"] = edited_df.at[i, "Category"]
+
+                # Future date warning
+                try:
+                    edited_date = pd.to_datetime(edited_df.at[i, "Date"])
+                    if edited_date.date() > datetime.today().date():
+                        st.warning(f"⚠️ Row {i+1}: Date '{edited_date.date()}' is in the future. Please correct it.")
+                except Exception:
+                    st.warning(f"⚠️ Row {i+1}: Invalid date format.")
+
+            # Confirm Save Button
             if st.button("💾 Save All Pending Transactions", type="primary", use_container_width=True):
                 temp_receipts = st.session_state["pending_receipts"].copy()
-                
-                # Process all transactions first
+
                 with st.spinner("Saving transactions..."):
                     transaction_ids = []
+                    import backend.utils.receipt_parser as rp
+                    original_categorize = rp.categorize_transaction
+
                     for receipt in temp_receipts:
+                        # Override categorization to respect user-edited category
+                        def dummy_categorize(vendor, text):
+                            return receipt["category"]
+                        rp.categorize_transaction = dummy_categorize
+
                         tx_id = add_transaction_to_state(
                             receipt["vendor"],
                             receipt["amount"],
                             receipt["date"],
                             receipt["text"]
                         )
+
+                        rp.categorize_transaction = original_categorize  # Restore original
+
+                        if st.session_state.get("duplicate_warning"):
+                            st.warning("⚠️ This transaction already exists and was skipped.")
+                            st.session_state.duplicate_warning = False
+                            continue
                         transaction_ids.append(tx_id)
-                
-                # Only clear states after all transactions are processed
+
+                # Clean up after saving
                 st.session_state["pending_receipts"] = []
                 st.session_state["uploaded_files"] = []
                 st.session_state["processing_status"] = {}
                 st.session_state["webcam_img"] = None
                 st.session_state["webcam_capture_requested"] = False
-                st.session_state["just_saved"] = True
-                
-                # Now trigger a single rerun after all processing is complete
+
+                if transaction_ids:
+                    st.session_state["just_saved"] = True
+                else:
+                    st.warning("⚠️ Duplicate transactions were skipped. No new transactions were saved.")
+                    st.session_state["just_saved"] = False
+
                 st.rerun()
+
 
     # ========== 📊 Recent Receipt Transactions Section ==========
     if "transactions" in st.session_state:
@@ -298,13 +345,35 @@ def show_receipt_parser():
             # Show transactions in a table with delete option
             for tx in receipt_tx:
                 cols = st.columns([2, 3, 2, 2, 1])
-                cols[0].markdown(tx["date"])
+                # cols[0].markdown(tx["date"])
+                parsed_date = pd.to_datetime(tx["date"], errors="coerce")
+                cols[0].markdown(parsed_date.strftime("%Y-%m-%d") if not pd.isnull(parsed_date) else tx["date"])
                 cols[1].markdown(tx["merchant_name"])
                 cols[2].markdown(f"${tx['amount']:.2f}")
                 cols[3].markdown(", ".join(tx.get("category", [])))
                 
-                # Add delete button
-                if cols[4].button("❌", key=f"del_{tx['transaction_id']}"):
-                    delete_receipt_transaction(tx["transaction_id"])
-                    st.success("🗑️ Receipt deleted.")
-                    st.rerun()
+                with cols[4]:
+                    if st.button("❌", key=f"del_btn_{tx['transaction_id']}"):
+                        st.session_state["confirm_delete_id"] = tx["transaction_id"]
+
+                # Display confirmation area after the row (outside the columns)
+                if st.session_state.get("confirm_delete_id") == tx["transaction_id"]:
+                    tx_id = tx["transaction_id"]
+                    st.markdown("----")
+                    st.error(
+                        f"🗑️ **Confirm deletion** of **{tx['merchant_name']}** "
+                        f"(${tx['amount']:.2f}) on {tx['date'].split()[0]}?"
+                    )
+                    confirm_col, cancel_col = st.columns([1, 1])
+
+                    with confirm_col:
+                        if st.button("✅ Yes, Delete", key=f"confirm_yes_{tx_id}"):
+                            delete_receipt_transaction(tx_id)
+                            st.success("Transaction deleted.")
+                            del st.session_state["confirm_delete_id"]
+                            st.rerun()
+
+                    with cancel_col:
+                        if st.button("❌ Cancel", key=f"confirm_no_{tx_id}"):
+                            del st.session_state["confirm_delete_id"]
+                            st.rerun()
